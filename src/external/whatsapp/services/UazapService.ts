@@ -12,7 +12,7 @@ export class UazapService {
     this.client = axios.create({
       baseURL: baseUrl,
       headers: {
-        apikey: token,
+        token: token,
         "Content-Type": "application/json",
       },
       timeout: 10_000,
