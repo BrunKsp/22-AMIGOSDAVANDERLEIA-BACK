@@ -1,4 +1,4 @@
-import Anthropic from "@anthropic-ai/sdk";
+import axios from "axios";
 import { Message } from "../../../data/Infra.Documents/Message";
 import { Types } from "mongoose";
 
@@ -22,12 +22,12 @@ Regras:
 - Quando o produtor registrar um gasto, confirme o registro de forma clara e amigável`;
 
 export class AiService {
-  private client: Anthropic;
+  private apiKey: string;
 
   constructor() {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
-    if (!apiKey) throw new Error("ANTHROPIC_API_KEY não definida");
-    this.client = new Anthropic({ apiKey });
+    const apiKey = process.env.OPENAI_API_KEY;
+    if (!apiKey) throw new Error("OPENAI_API_KEY não definida");
+    this.apiKey = apiKey;
   }
 
   async generateReply(
@@ -39,7 +39,7 @@ export class AiService {
       .limit(CONTEXT_WINDOW)
       .lean();
 
-    const messages: Anthropic.MessageParam[] = history
+    const messages = history
       .reverse()
       .map((m) => ({
         role: m.direction === "inbound" ? "user" : "assistant",
@@ -48,15 +48,24 @@ export class AiService {
 
     messages.push({ role: "user", content: userMessage });
 
-    const response = await this.client.messages.create({
-      model: "claude-haiku-4-5-20251001",
-      max_tokens: 512,
-      system: SYSTEM_PROMPT,
-      messages,
-    });
+    const response = await axios.post(
+      "https://api.openai.com/v1/chat/completions",
+      {
+        model: "gpt-4o-mini",
+        max_tokens: 512,
+        messages: [
+          { role: "system", content: SYSTEM_PROMPT },
+          ...messages,
+        ],
+      },
+      {
+        headers: {
+          Authorization: `Bearer ${this.apiKey}`,
+          "Content-Type": "application/json",
+        },
+      }
+    );
 
-    const block = response.content[0];
-    if (block.type !== "text") throw new Error("Resposta inesperada da IA");
-    return block.text;
+    return response.data.choices[0].message.content as string;
   }
 }

@@ -11,7 +11,7 @@ import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsA
 export class WhatsAppService {
   private otpService     = new OtpService();
   private uazap          = new UazapService();
-  private ai             = process.env.ANTHROPIC_API_KEY ? new AiService() : null;
+  private ai             = process.env.OPENAI_API_KEY ? new AiService() : null;
   private transcription  = process.env.OPENAI_API_KEY ? new TranscriptionService() : null;
 
   async sendOtp(userSlug: string): Promise<string> {
