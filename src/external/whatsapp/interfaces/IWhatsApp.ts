@@ -37,7 +37,7 @@ export interface IUazapWebhookPayload {
   chat: {
     phone: string;
     name?: string;
-    wa_chatid?: string;
+    wa_chatid: string;
     wa_isGroup?: boolean;
   };
   message: {
@@ -47,6 +47,7 @@ export interface IUazapWebhookPayload {
     wasSentByApi: boolean;
     isGroup: boolean;
     messageTimestamp: number;
+    messageid: string;
     type?: string;
     mediaType?: string;
     sender_pn?: string;

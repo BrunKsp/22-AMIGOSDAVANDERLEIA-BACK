@@ -54,6 +54,12 @@ export class WhatsAppService {
     const content = (message.text || message.content || "").trim();
     if (!content) return;
 
+    // Deduplicação: ignora mensagem já processada
+    if (message.messageid) {
+      const exists = await Message.exists({ messageId: message.messageid });
+      if (exists) return;
+    }
+
     const isAudio = message.type === "audio" || message.mediaType === "audio";
 
     const conversation = await Conversation.findOneAndUpdate(
@@ -64,6 +70,7 @@ export class WhatsAppService {
 
     await Message.create({
       conversationId: conversation._id,
+      messageId: message.messageid,
       phoneNumber: phone,
       userSlug: conversation.userSlug,
       direction: "inbound",

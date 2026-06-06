@@ -8,6 +8,7 @@ export interface IMessageDocument extends Omit<IMessage, "conversationId">, Docu
 const MessageSchema = new Schema<IMessageDocument>(
   {
     conversationId: { type: Schema.Types.ObjectId, ref: "Conversation", required: true, index: true },
+    messageId:      { type: String, sparse: true },
     phoneNumber:    { type: String, required: true },
     userSlug:       { type: String },
     direction:      { type: String, enum: ["inbound", "outbound"] as MessageDirection[], required: true },
@@ -20,5 +21,6 @@ const MessageSchema = new Schema<IMessageDocument>(
 );
 
 MessageSchema.index({ conversationId: 1, sentAt: -1 });
+MessageSchema.index({ messageId: 1 }, { unique: true, sparse: true });
 
 export const Message = model<IMessageDocument>("Message", MessageSchema);
