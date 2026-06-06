@@ -36,6 +36,9 @@ export class User implements IUser {
   @Column({ default: true })
   active!: boolean;
 
+  @Column({ name: "phone_verified", default: false })
+  phoneVerified!: boolean;
+
   @CreateDateColumn({ name: "created_at" })
   createdAt!: Date;
 

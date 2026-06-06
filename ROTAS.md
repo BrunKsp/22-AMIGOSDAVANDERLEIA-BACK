@@ -231,6 +231,66 @@ Remove um usuário.
 
 ---
 
+## WhatsApp — `/whatsapp`
+
+> As rotas de envio e verificação de OTP exigem `Authorization: Bearer <token>`.
+> O webhook é público (chamado pelo uazap).
+
+---
+
+### `POST /whatsapp/send-otp` 🔒
+Envia um código de verificação de 6 dígitos via WhatsApp para o número (`phone`) cadastrado no perfil do usuário autenticado.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Body:** nenhum
+
+**Resposta `200`:**
+```json
+{ "message": "Código enviado para +5511912345678 via WhatsApp" }
+```
+
+**Erros:**
+- `401` — token ausente ou inválido
+- `400` — "Número já verificado"
+- `400` — "Nenhum telefone cadastrado no perfil"
+
+---
+
+### `POST /whatsapp/verify-otp` 🔒
+Valida o código recebido. Em caso de sucesso: marca `phoneVerified = true` no banco, cria/ativa a conversa no MongoDB e envia mensagem de boas-vindas pelo WhatsApp.
+
+**Headers:** `Authorization: Bearer <token>`
+
+**Body:**
+```json
+{ "code": "123456" }
+```
+
+**Resposta `200`:**
+```json
+{ "message": "WhatsApp vinculado com sucesso!" }
+```
+
+**Erros:**
+- `401` — token ausente ou inválido
+- `400` — "Código incorreto. X tentativa(s) restante(s)."
+- `400` — "Código expirado ou não encontrado. Solicite um novo."
+- `400` — "Número de tentativas excedido. Solicite um novo código." (após 3 tentativas erradas)
+
+---
+
+### `POST /whatsapp/webhook`
+Recebimento de mensagens enviadas pelo uazap. Responde `200` imediatamente e processa de forma assíncrona: salva a mensagem no MongoDB, gera resposta via IA (Claude Haiku) e envia de volta pelo WhatsApp.
+
+Conversas com status `pending_otp` (número não vinculado) recebem uma mensagem orientando o usuário a vincular a conta na plataforma.
+
+**Body:** payload padrão do uazap (enviado automaticamente)
+
+**Resposta `200`:** sem corpo (resposta imediata para evitar timeout)
+
+---
+
 ## Resumo das rotas
 
 | Método | Rota | Auth | Descrição |
@@ -242,4 +302,7 @@ Remove um usuário.
 | `GET` | `/users/:slugUsuario` | ✅ | Buscar por slug |
 | `PUT` | `/users/:slugUsuario` | ✅ | Atualizar usuário |
 | `DELETE` | `/users/:slugUsuario` | ✅ | Remover usuário |
+| `POST` | `/whatsapp/send-otp` | ✅ | Enviar código OTP via WhatsApp |
+| `POST` | `/whatsapp/verify-otp` | ✅ | Validar código e vincular número |
+| `POST` | `/whatsapp/webhook` | ❌ | Receber mensagens do uazap |
 | `GET` | `/health` | ❌ | Status da API |

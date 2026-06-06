@@ -2,7 +2,7 @@ import "reflect-metadata";
 import "dotenv/config";
 import path from "path";
 import { DataSource } from "typeorm";
-import { User } from "../data/models/User";
+import { User } from "../data/Infra.PG/User";
 
 const DataSourceCli = new DataSource({
   type: "postgres",

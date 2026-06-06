@@ -2,6 +2,7 @@ import "reflect-metadata";
 import express from "express";
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
+import whatsappRoutes from "./routes/whatsappRoutes";
 
 const app = express();
 
@@ -13,5 +14,6 @@ app.get("/health", (_req, res) => {
 
 app.use("/auth", authRoutes);
 app.use("/users", userRoutes);
+app.use("/whatsapp", whatsappRoutes);
 
 export default app;
