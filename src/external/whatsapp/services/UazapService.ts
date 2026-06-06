@@ -1,12 +1,5 @@
 import axios, { AxiosInstance } from "axios";
 
-export interface DownloadedMedia {
-  buffer: Buffer;
-  mimetype: string;
-  /** Texto transcrito, presente apenas quando a transcrição nativa do Uazapi é usada. */
-  transcription?: string;
-}
-
 export class UazapService {
   private client: AxiosInstance;
 
@@ -22,7 +15,7 @@ export class UazapService {
         token: token,
         "Content-Type": "application/json",
       },
-      timeout: 30_000,
+      timeout: 10_000,
     });
   }
 
@@ -33,13 +26,9 @@ export class UazapService {
     });
   }
 
-  /**
-   * Baixa a mídia de uma mensagem usando o endpoint oficial do Uazapi.
-   * Retorna o áudio convertido em MP3 (ideal para o Whisper), em base64.
-   *
-   * Doc: POST /message/download  body { id, return_base64, generate_mp3 }
-   */
-  async downloadMedia(messageId: string): Promise<DownloadedMedia> {
+  // Baixa a mídia de uma mensagem pelo endpoint oficial do Uazapi.
+  // Doc: POST /message/download  body { id, return_base64, generate_mp3 }
+  async downloadMedia(messageId: string): Promise<Buffer> {
     const response = await this.client.post("/message/download", {
       id:            messageId,
       return_base64: true,
@@ -47,42 +36,16 @@ export class UazapService {
       return_link:   false,
     });
 
-    const data = response.data ?? {};
-    const base64: string | undefined = data.base64Data;
-    if (!base64) {
-      throw new Error("Uazapi não retornou base64Data no download da mídia");
-    }
+    const base64: string | undefined = response.data?.base64Data;
+    if (!base64) throw new Error("Uazapi não retornou base64Data no download da mídia");
 
-    // O base64 pode vir como data URI (data:audio/mpeg;base64,xxxx) — limpa o prefixo.
+    // pode vir como data URI (data:audio/mpeg;base64,xxx) — limpa o prefixo
     const clean = base64.includes(",") ? base64.split(",").pop()! : base64;
-
-    return {
-      buffer:   Buffer.from(clean, "base64"),
-      mimetype: (data.mimetype || "audio/mpeg").split(";")[0].trim(),
-    };
-  }
-
-  /**
-   * Transcrição nativa do Uazapi (Whisper integrado). Um único call: o Uazapi
-   * baixa, descriptografa e transcreve o áudio do WhatsApp.
-   *
-   * Doc: POST /message/download  body { id, transcribe, openai_apikey }
-   */
-  async transcribeAudio(messageId: string, openaiApiKey?: string): Promise<string> {
-    const response = await this.client.post("/message/download", {
-      id:            messageId,
-      transcribe:    true,
-      generate_mp3:  true,
-      return_base64: false,
-      return_link:   false,
-      ...(openaiApiKey ? { openai_apikey: openaiApiKey } : {}),
-    });
-
-    return (response.data?.transcription || "").trim();
+    return Buffer.from(clean, "base64");
   }
 
   async downloadMediaFromUrl(url: string): Promise<Buffer> {
-    const response = await axios.get(url, { responseType: "arraybuffer", timeout: 30_000 });
+    const response = await axios.get(url, { responseType: "arraybuffer", timeout: 15_000 });
     return Buffer.from(response.data);
   }
 

@@ -7,8 +7,7 @@ import { TranscriptionService } from "../../external/whatsapp/services/Transcrip
 import { Conversation } from "../../data/Infra.Documents/Conversation";
 import { Message } from "../../data/Infra.Documents/Message";
 import { Transaction } from "../../data/Infra.Documents/Transaction";
-import { IUazapWebhookPayload, IInboundMessage } from "../../external/whatsapp/interfaces/IWhatsApp";
-import { parseInbound } from "../../external/whatsapp/utils/parseInbound";
+import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsApp";
 import { normalizePhone } from "../../shared/utils/normalizePhone";
 import { UserRepository } from "../../infra/repositories/UserRepository";
 
@@ -66,20 +65,23 @@ export class WhatsAppService {
   }
 
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
-    const inbound = parseInbound(payload.data ?? {});
+    const { chat, message } = payload;
 
-    if (inbound.fromMe || inbound.wasSentByApi || inbound.isGroup) return;
-    if (!inbound.phone) return;
+    if (message.fromMe || message.wasSentByApi) return;
 
-    const phone   = normalizePhone(inbound.phone);
-    const replyTo = inbound.phone;
+    const phone   = normalizePhone(chat.wa_chatid.replace("@s.whatsapp.net", ""));
+    const replyTo = chat.wa_chatid.replace("@s.whatsapp.net", "");
 
-    // Para texto já temos o conteúdo; para áudio será preenchido após transcrição.
-    let content = inbound.isAudio ? "" : inbound.text;
-    if (!inbound.isAudio && !content) return;
+    const isAudio = message.type === "audio" || message.type === "ptt" || message.mediaType === "audio";
+
+    // Para texto, extrai o conteúdo bruto agora; para áudio, será preenchido após transcrição
+    let content = isAudio ? "" : (message.text || message.content || "").trim();
+    let transcribedText: string | null = null;
+
+    if (!isAudio && !content) return;
 
     // Deduplicação por messageId
-    if (inbound.messageId && (await Message.exists({ messageId: inbound.messageId }))) {
+    if (message.messageid && (await Message.exists({ messageId: message.messageid }))) {
       return;
     }
 
@@ -89,35 +91,57 @@ export class WhatsAppService {
       { upsert: true, returnDocument: "after" }
     );
 
-    // ── Transcrição de áudio ──────────────────────────────────
-    if (inbound.isAudio) {
+    // Transcreve áudio antes de salvar a mensagem
+    if (isAudio) {
+      if (!this.transcription) {
+        await this.uazap.sendText(replyTo, "⚠️ Transcrição de áudio não disponível no momento. Pode digitar sua mensagem?");
+        return;
+      }
       try {
-        content = await this.resolveAudioText(inbound);
+        const mimetype = message.mimetype?.split(";")[0] ?? "audio/ogg";
+        let audioBuffer: Buffer;
+
+        if (message.mediaBase64) {
+          // Uazap já envia o áudio em base64 no payload — caminho mais rápido
+          audioBuffer = Buffer.from(message.mediaBase64, "base64");
+        } else if (message.mediaUrl) {
+          // Fallback: URL pública para download
+          audioBuffer = await this.uazap.downloadMediaFromUrl(message.mediaUrl);
+        } else {
+          // Fallback: download via endpoint do Uazap usando o id da mensagem
+          audioBuffer = await this.uazap.downloadMedia(message.messageid);
+        }
+
+        console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes, mimetype: ${mimetype}`);
+
+        transcribedText = await this.transcription.transcribe(audioBuffer, mimetype);
+        content = transcribedText.trim();
+
+        if (!content) {
+          await this.uazap.sendText(replyTo, "Não consegui entender o áudio 🎙️ Pode repetir ou digitar?");
+          return;
+        }
+
+        console.log(`[audio] Transcrição: "${content}"`);
       } catch (err: any) {
         console.error("[audio] Falha ao processar áudio:", err.response?.data ?? err.message);
-        await this.uazap.sendText(replyTo, "Tive um problema ao processar seu áudio 🙁 Pode tentar de novo ou me mandar por texto?");
+        await this.uazap.sendText(replyTo, "Tive um problema ao processar seu áudio 🙁 Tente digitar sua mensagem.");
         return;
       }
-
-      if (!content) {
-        await this.uazap.sendText(replyTo, "Não consegui entender o áudio 🎙️ Pode repetir ou me mandar por texto?");
-        return;
-      }
-      console.log(`[audio] Transcrição: "${content}"`);
     }
 
     // Salva mensagem inbound (com transcrição no content para áudio)
     try {
       await Message.create({
         conversationId: conversation._id,
-        messageId:      inbound.messageId,
+        messageId:      message.messageid,
         phoneNumber:    phone,
         userSlug:       conversation.userSlug,
         direction:      "inbound",
-        type:           inbound.isAudio ? "audio" : "text",
+        type:           isAudio ? "audio" : "text",
         content,
-        rawPayload:     payload.data as unknown as Record<string, unknown>,
-        sentAt:         inbound.sentAt,
+        rawPayload:     message as unknown as Record<string, unknown>,
+        sentAt:         new Date(message.messageTimestamp * 1000),
       });
     } catch (err: any) {
       if (err?.code === 11000) return; // duplicado por race condition
@@ -125,27 +149,29 @@ export class WhatsAppService {
     }
 
     if (conversation.status !== "active") {
+      // Verifica se o usuário já tem o número verificado no Postgres
       const pgUser = await this.userRepository.findByPhone(phone);
 
       console.log(`[webhook] status=${conversation.status} phone=${phone} pgUser=${pgUser?.slug ?? "null"} phoneVerified=${pgUser?.phoneVerified ?? "null"}`);
 
       if (pgUser?.phoneVerified) {
+        // Ativa a conversa no Mongo e continua o fluxo normalmente
         await Conversation.findOneAndUpdate(
           { phoneNumber: phone },
           { userSlug: pgUser.slug, status: "active" }
         );
-        conversation.status   = "active";
+        conversation.status  = "active";
         conversation.userSlug = pgUser.slug;
       } else {
         await this.uazap.sendText(
           replyTo,
-          `Olá, ${inbound.senderName ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
+          `Olá, ${chat.name ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
         );
         return;
       }
     }
 
-    // ── Gera resposta da IA (idêntico ao fluxo de texto) ──────
+    // Gera resposta da IA (com detecção de transação via function calling)
     let aiReply: string;
     try {
       if (!this.ai) {
@@ -154,6 +180,7 @@ export class WhatsAppService {
         const result = await this.ai.generateReply(conversation._id, content, conversation.userSlug);
         aiReply = result.reply;
 
+        // Salva transação extraída pela IA
         if (result.transaction && conversation.userSlug) {
           try {
             await Transaction.create({
@@ -194,55 +221,5 @@ export class WhatsAppService {
     } catch (err: any) {
       console.error("[uazap] Erro ao enviar mensagem:", err.response?.data ?? err.message);
     }
-  }
-
-  /**
-   * Obtém o texto de um áudio recebido.
-   *
-   * Estratégia (em ordem de preferência):
-   *  1. Transcrição nativa do Uazapi (1 call: baixa, descriptografa e transcreve)
-   *  2. Download do áudio em MP3 + Whisper próprio (TranscriptionService)
-   *
-   * Cada etapa tenta o id principal e, em caso de falha, o id alternativo,
-   * já que o Uazapi expõe tanto o id interno quanto o id do provedor.
-   */
-  private async resolveAudioText(inbound: IInboundMessage): Promise<string> {
-    const ids = [inbound.downloadId, inbound.altDownloadId].filter(Boolean) as string[];
-    if (!ids.length) {
-      throw new Error("Mensagem de áudio sem id para download");
-    }
-
-    const openaiKey = process.env.OPENAI_API_KEY;
-
-    // 1) Transcrição nativa do Uazapi
-    for (const id of ids) {
-      try {
-        const text = await this.uazap.transcribeAudio(id, openaiKey);
-        if (text) {
-          console.log(`[audio] Transcrito via Uazapi (id=${id})`);
-          return text.trim();
-        }
-      } catch (err: any) {
-        console.warn(`[audio] Transcrição nativa falhou (id=${id}):`, err.response?.data ?? err.message);
-      }
-    }
-
-    // 2) Fallback: baixa o áudio e transcreve com nosso próprio Whisper
-    if (!this.transcription) {
-      throw new Error("Transcrição indisponível (OPENAI_API_KEY ausente) e Uazapi não transcreveu");
-    }
-
-    for (const id of ids) {
-      try {
-        const media = await this.uazap.downloadMedia(id);
-        console.log(`[audio] Buffer obtido via Uazapi (id=${id}): ${media.buffer.length} bytes, ${media.mimetype}`);
-        const text = await this.transcription.transcribe(media.buffer, media.mimetype);
-        if (text.trim()) return text.trim();
-      } catch (err: any) {
-        console.warn(`[audio] Download/transcrição própria falhou (id=${id}):`, err.response?.data ?? err.message);
-      }
-    }
-
-    return "";
   }
 }
