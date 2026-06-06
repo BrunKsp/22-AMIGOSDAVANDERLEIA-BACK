@@ -19,6 +19,7 @@ export interface IUserRepository {
   findBySlug(slug: string): Promise<IUser | null>;
   findByEmail(email: string): Promise<IUser | null>;
   findByCpf(cpf: string): Promise<IUser | null>;
+  findByPhone(phone: string): Promise<IUser | null>;
   create(data: ICreateUserData): Promise<IUser>;
   update(slug: string, data: IUpdateUserData): Promise<IUser | null>;
   delete(slug: string): Promise<boolean>;
