@@ -30,6 +30,10 @@ export class UserRepository implements IUserRepository {
     return this.repo.findOneBy({ cpf });
   }
 
+  async findByPhone(phone: string): Promise<IUser | null> {
+    return this.repo.findOneBy({ phone });
+  }
+
   async create(data: ICreateUserData): Promise<IUser> {
     const user = this.repo.create(data);
     return this.repo.save(user);

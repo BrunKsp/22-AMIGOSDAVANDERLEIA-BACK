@@ -9,12 +9,14 @@ import { Message } from "../../data/Infra.Documents/Message";
 import { Transaction } from "../../data/Infra.Documents/Transaction";
 import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsApp";
 import { normalizePhone } from "../../shared/utils/normalizePhone";
+import { UserRepository } from "../../infra/repositories/UserRepository";
 
 export class WhatsAppService {
   private otpService     = new OtpService();
   private uazap          = new UazapService();
   private ai             = process.env.OPENAI_API_KEY ? new AiService() : null;
   private transcription  = process.env.OPENAI_API_KEY ? new TranscriptionService() : null;
+  private userRepository = new UserRepository();
 
   async sendOtp(userSlug: string): Promise<string> {
     const userRepo = AppDataSource.getRepository(User);
@@ -119,11 +121,25 @@ export class WhatsAppService {
     }
 
     if (conversation.status !== "active") {
-      await this.uazap.sendText(
-        replyTo,
-        `Olá, ${chat.name ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
-      );
-      return;
+      // Verifica se o usuário já tem o número verificado no Postgres (pode ter verificado
+      // por outro caminho e a conversa no Mongo ainda não foi ativada)
+      const pgUser = await this.userRepository.findByPhone(phone);
+
+      if (pgUser?.phoneVerified) {
+        // Ativa a conversa no Mongo e continua o fluxo normalmente
+        await Conversation.findOneAndUpdate(
+          { phoneNumber: phone },
+          { userSlug: pgUser.slug, status: "active" }
+        );
+        conversation.status  = "active";
+        conversation.userSlug = pgUser.slug;
+      } else {
+        await this.uazap.sendText(
+          replyTo,
+          `Olá, ${chat.name ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
+        );
+        return;
+      }
     }
 
     // Gera resposta da IA (com detecção de transação via function calling)
