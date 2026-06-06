@@ -19,9 +19,7 @@ export class UpdateUserDto {
   email?: string;
 
   @IsOptional()
-  @Matches(/^\(\d{2}\)\s?\d{4,5}-\d{4}$/, {
-    message: "Telefone inválido. Formato esperado: (11) 91234-5678",
-  })
+  @IsString()
   phone?: string;
 
   @IsOptional()

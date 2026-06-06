@@ -9,7 +9,8 @@
       "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\models\" -Recurse -Force)",
       "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\services\\\\WhatsAppService.ts\" -Force)",
       "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\services\\\\OtpService.ts\" -ErrorAction SilentlyContinue -Force)",
-      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\controllers\" -Recurse -Force -ErrorAction SilentlyContinue)"
+      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\controllers\" -Recurse -Force -ErrorAction SilentlyContinue)",
+      "PowerShell(node -e \"console.log\\(/^[\\\\d\\\\s\\\\\\(\\\\\\)\\\\-\\\\+]{10,20}$/.test\\('5551998635772'\\)\\)\")"
     ]
   }
 }

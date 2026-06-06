@@ -18,6 +18,7 @@ export class CreateUserDto {
   email!: string;
 
   @IsNotEmpty({ message: "Telefone é obrigatório" })
+  @IsString()
   phone!: string;
 
   @IsNotEmpty({ message: "CPF é obrigatório" })
