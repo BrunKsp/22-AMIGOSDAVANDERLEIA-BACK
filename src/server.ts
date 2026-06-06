@@ -6,13 +6,21 @@ import { AppDataSource } from "./config/database";
 const PORT = process.env.PORT ?? 3000;
 
 AppDataSource.initialize()
-  .then(() => {
-    console.log("MongoDB connected via TypeORM");
+  .then(async () => {
+    console.log("PostgreSQL conectado via TypeORM");
+
+    const pending = await AppDataSource.showMigrations();
+    if (pending) {
+      console.log("Aplicando migrations pendentes...");
+      await AppDataSource.runMigrations();
+      console.log("Migrations aplicadas com sucesso");
+    }
+
     app.listen(PORT, () => {
-      console.log(`Server running on port ${PORT}`);
+      console.log(`Servidor rodando na porta ${PORT}`);
     });
   })
   .catch((err) => {
-    console.error("Database connection failed:", err);
+    console.error("Falha na conexão com o banco:", err);
     process.exit(1);
   });
