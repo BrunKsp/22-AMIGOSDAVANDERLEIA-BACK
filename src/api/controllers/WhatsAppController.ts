@@ -30,14 +30,10 @@ export class WhatsAppController {
 
   async webhook(req: Request, res: Response): Promise<void> {
     res.sendStatus(200);
-    const body = req.body;
-    console.log("[webhook] FULL:", JSON.stringify(body, null, 2));
-
-    const dataList = Array.isArray(body?.data) ? body.data : [body?.data];
-    for (const data of dataList) {
-      if (!data) continue;
-      whatsAppService.handleWebhook({ event: body.event, instance: body.instance, data })
-        .catch((err) => console.error("[webhook] Erro:", err.message));
-    }
+    const payload = req.body as IUazapWebhookPayload;
+    if (!payload?.message?.text || payload.message.fromMe || payload.message.wasSentByApi || payload.message.isGroup) return;
+    whatsAppService.handleWebhook(payload).catch((err) => {
+      console.error("[webhook] Erro:", err.message);
+    });
   }
 }

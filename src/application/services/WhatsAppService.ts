@@ -52,29 +52,13 @@ export class WhatsAppService {
   }
 
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
-    const { data } = payload;
+    const { chat, message } = payload;
 
-    // Suporta formato simples {from, body} e Evolution API {key.remoteJid, message}
-    const fromRaw = data.from ?? data.key?.remoteJid ?? "";
-    if (!fromRaw) return;
-
-    const phone = normalizePhone(fromRaw.replace("@s.whatsapp.net", ""));
-
-    // Ignora mensagens enviadas pelo próprio bot
-    if (data.key?.fromMe === true) return;
-
-    const content = (
-      data.body ??
-      data.message?.conversation ??
-      data.message?.extendedTextMessage?.text ??
-      data.message?.imageMessage?.caption ??
-      ""
-    ).trim();
+    const phone   = normalizePhone(chat.phone);
+    const content = (message.text || message.content || "").trim();
     if (!content) return;
 
-    const isAudio = data.type === "audio" ||
-      data.mimetype?.includes("audio") ||
-      !!data.message?.audioMessage;
+    const isAudio = message.type === "audio" || message.mediaType === "audio";
 
     const conversation = await Conversation.findOneAndUpdate(
       { phoneNumber: phone },
@@ -89,14 +73,14 @@ export class WhatsAppService {
       direction: "inbound",
       type: isAudio ? "audio" : "text",
       content,
-      rawPayload: data as Record<string, unknown>,
-      sentAt: data.timestamp ? new Date(data.timestamp * 1000) : new Date(),
+      rawPayload: message as unknown as Record<string, unknown>,
+      sentAt: new Date(message.messageTimestamp),
     });
 
     if (conversation.status !== "active") {
       await this.uazap.sendText(
         phone,
-        `Olá! Para conversar comigo você precisa vincular este número na plataforma.\n\nAcesse a plataforma → Configurações → "Vincular WhatsApp".`
+        `Olá, ${chat.name ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
       );
       return;
     }

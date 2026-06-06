@@ -31,7 +31,24 @@ export interface IOtpToken {
 }
 
 export interface IUazapWebhookPayload {
-  event: string;
-  instance?: string;
-  data: Record<string, any>;
+  EventType: string;
+  BaseUrl: string;
+  instanceName: string;
+  chat: {
+    phone: string;
+    name?: string;
+    wa_chatid?: string;
+    wa_isGroup?: boolean;
+  };
+  message: {
+    text: string;
+    content?: string;
+    fromMe: boolean;
+    wasSentByApi: boolean;
+    isGroup: boolean;
+    messageTimestamp: number;
+    type?: string;
+    mediaType?: string;
+    sender_pn?: string;
+  };
 }
