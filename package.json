@@ -6,6 +6,10 @@
     "dev": "nodemon --watch src --ext ts --exec ts-node src/server.ts",
     "build": "tsc",
     "start": "node dist/server.js",
+    "migration:run": "npx typeorm-ts-node-commonjs migration:run -d src/config/dataSourceCli.ts",
+    "migration:revert": "npx typeorm-ts-node-commonjs migration:revert -d src/config/dataSourceCli.ts",
+    "migration:show": "npx typeorm-ts-node-commonjs migration:show -d src/config/dataSourceCli.ts",
+    "migration:generate": "node scripts/migration-generate.js",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
@@ -13,14 +17,22 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
+    "@types/pg": "^8.20.0",
+    "bcrypt": "^6.0.0",
+    "class-transformer": "^0.5.1",
+    "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
+    "jsonwebtoken": "^9.0.3",
     "mongodb": "^7.2.0",
+    "pg": "^8.21.0",
     "reflect-metadata": "^0.2.2",
     "typeorm": "^1.0.0"
   },
   "devDependencies": {
+    "@types/bcrypt": "^6.0.0",
     "@types/express": "^5.0.6",
+    "@types/jsonwebtoken": "^9.0.10",
     "@types/node": "^25.9.2",
     "nodemon": "^3.1.14",
     "ts-node": "^10.9.2",

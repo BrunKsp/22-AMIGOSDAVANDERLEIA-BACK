@@ -1,40 +1,35 @@
 import { Request, Response } from "express";
-import { UserService } from "../services/UserService";
+import { UserService } from "../../application/services/UserService";
+import { UpdateUserDto } from "../../application/dtos/UpdateUserDto";
 
 const userService = new UserService();
 
 export class UserController {
-  async getAll(req: Request, res: Response): Promise<void> {
+  async getAll(_req: Request, res: Response): Promise<void> {
     try {
       const users = await userService.getAll();
-      res.json(users);
+      res.json({ data: users, total: users.length });
     } catch (err: any) {
       res.status(500).json({ message: err.message });
     }
   }
 
-  async getById(req: Request, res: Response): Promise<void> {
+  async getBySlug(req: Request, res: Response): Promise<void> {
     try {
-      const user = await userService.getById(req.params.id!);
-      res.json(user);
+      const user = await userService.getBySlug(req.params["slugUsuario"] as string);
+      res.json({ data: user });
     } catch (err: any) {
       res.status(404).json({ message: err.message });
     }
   }
 
-  async create(req: Request, res: Response): Promise<void> {
-    try {
-      const user = await userService.create(req.body);
-      res.status(201).json(user);
-    } catch (err: any) {
-      res.status(400).json({ message: err.message });
-    }
-  }
-
   async update(req: Request, res: Response): Promise<void> {
     try {
-      const user = await userService.update(req.params.id!, req.body);
-      res.json(user);
+      const user = await userService.update(
+        req.params["slugUsuario"] as string,
+        req.body as UpdateUserDto
+      );
+      res.json({ message: "Usuário atualizado com sucesso", data: user });
     } catch (err: any) {
       res.status(400).json({ message: err.message });
     }
@@ -42,7 +37,7 @@ export class UserController {
 
   async delete(req: Request, res: Response): Promise<void> {
     try {
-      await userService.delete(req.params.id!);
+      await userService.delete(req.params["slugUsuario"] as string);
       res.status(204).send();
     } catch (err: any) {
       res.status(404).json({ message: err.message });
