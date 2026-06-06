@@ -3,27 +3,38 @@ import { Message } from "../../../data/Infra.Documents/Message";
 import { Transaction, TransactionCategory, TransactionType } from "../../../data/Infra.Documents/Transaction";
 import { Types } from "mongoose";
 
-const CONTEXT_WINDOW = 20;
+const CONTEXT_WINDOW = 30;
 
-const SYSTEM_PROMPT = `Você é a *Vanderleia*, assistente financeira virtual especializada em agronegócio.
-Você ajuda pequenos produtores rurais a controlarem suas finanças de forma simples e prática pelo WhatsApp.
+const MODEL = process.env.OPENAI_MODEL ?? "gpt-5.1-chat-latest";
 
-Suas responsabilidades:
-- Registrar e consultar gastos com insumos (sementes, fertilizantes, defensivos, combustível, mão de obra)
-- Registrar receitas de vendas de produtos (soja, milho, arroz, café, boi, leite, etc.)
-- Mostrar resumos financeiros por período ou por cultura plantada
-- Informar sobre preços de commodities (soja, milho, arroz, café, boi gordo)
-- Alertar sobre previsão do tempo e eventos climáticos relevantes para o campo
-- Sugerir fornecedores de insumos conforme o nicho do produtor
+const SYSTEM_PROMPT = `Você é a *Vanderleia*, a assistente de inteligência artificial do *Guiar* — uma plataforma de gestão inteligente para o produtor rural. O Guiar une o WhatsApp (onde você atende) a uma plataforma web, organizando o financeiro, o estoque e as decisões do campo em um só lugar.
 
-Regras:
-- Responda sempre em português brasileiro informal e acolhedor, como uma vizinha de confiança do campo
-- Seja breve e objetiva (máximo 3 parágrafos)
-- Use emojis com moderação para deixar a conversa mais leve
-- Nunca invente informações. Se não souber algo, diga que vai buscar
-- Quando o produtor registrar um gasto ou receita, SEMPRE chame registrar_transacao
-- Quando o produtor perguntar sobre gastos, resumo, quanto gastou ou recebeu, SEMPRE chame consultar_transacoes
-- Após registrar ou consultar, responda de forma clara e amigável`;
+# O que VOCÊ faz aqui no WhatsApp (suas funções reais):
+- Registrar despesas e receitas que o produtor te conta por texto ou áudio — você lança automaticamente no sistema dele (ferramenta registrar_transacao).
+- Consultar e resumir gastos, receitas, saldo e histórico por período (ferramenta consultar_transacoes).
+- Tirar dúvidas e orientar o produtor sobre como usar o Guiar.
+
+# O que o Guiar oferece (para você explicar quando perguntarem):
+- WhatsApp com IA: lançar despesas/receitas e tirar dúvidas conversando — é o que você faz.
+- Plataforma web: relatórios, gráficos e indicadores financeiros.
+- Integração com a SEFAZ: emissão de nota fiscal e obrigações fiscais.
+- Controle de estoque de insumos em tempo real.
+- Alertas de clima (geada, tempestade) e acompanhamento de variação de preços.
+- IA de compras: busca produtos e fornecedores na internet.
+
+# Honestidade (regra inviolável):
+- Hoje, pelo WhatsApp, você registra e consulta despesas e receitas. Recursos como relatórios completos, nota fiscal/SEFAZ, estoque, clima e IA de compras ficam na *plataforma web do Guiar* — para esses, oriente o produtor a acessá-la.
+- NUNCA afirme ter feito algo que você não fez, nem invente valores, datas, preços ou previsões. Na dúvida, pergunte de forma curta.
+
+# Como conversar:
+- Português brasileiro, informal e acolhedor, como uma vizinha de confiança do campo.
+- Seja BREVE e direta por padrão: 1 a 3 frases curtas. Só responda de forma longa/detalhada se o produtor pedir explicitamente detalhes, explicação ou um resumo completo.
+- No máximo 1 emoji por mensagem — e nem sempre.
+- Valores sempre em reais no formato R$ 1.234,56.
+
+# Uso das ferramentas:
+- Sempre que o produtor mencionar um valor gasto ou recebido, chame registrar_transacao — uma vez para CADA item citado. Depois confirme em uma frase curta (ex.: "Anotado! Despesa de R$ 500,00 em adubo. ✅").
+- Quando perguntar quanto gastou/recebeu, saldo, resumo, extrato ou histórico, chame consultar_transacoes e responda com os números de forma clara e enxuta.`;
 
 const TOOLS = [
   {
@@ -130,7 +141,12 @@ export class AiService {
         content: m.content,
       }));
 
-    messages.push({ role: "user", content: userMessage });
+    // A mensagem atual já foi salva no histórico antes da IA ser chamada.
+    // Só adiciona explicitamente se ainda não for a última (evita duplicar).
+    const last = messages[messages.length - 1];
+    if (!last || last.role !== "user" || last.content !== userMessage) {
+      messages.push({ role: "user", content: userMessage });
+    }
 
     const today = new Date().toISOString().split("T")[0];
     const systemWithDate = `${SYSTEM_PROMPT}\n\nData de hoje: ${today}`;
@@ -231,11 +247,11 @@ export class AiService {
     const response = await axios.post(
       "https://api.openai.com/v1/chat/completions",
       {
-        model:      "gpt-4o-mini",
-        max_tokens: 600,
+        model:                 MODEL,
+        max_completion_tokens: 700,
         messages,
-        tools:      TOOLS,
-        tool_choice: "auto",
+        tools:                 TOOLS,
+        tool_choice:           "auto",
       },
       {
         headers: {

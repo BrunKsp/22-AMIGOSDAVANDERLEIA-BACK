@@ -60,7 +60,7 @@ export class WhatsAppService {
 
     await this.uazap.sendText(
       user.phone,
-      `✅ Número vinculado com sucesso!\n\nOlá, *${user.name}*! Agora posso te ajudar aqui pelo WhatsApp. Como posso ajudar?`
+      `✅ Número vinculado com sucesso!\n\nOlá, *${user.name}*! Eu sou a *Vanderleia*, sua assistente do *Guiar* 🌱\n\nPode me mandar suas despesas e receitas por texto ou áudio que eu organizo tudo pra você. Como posso ajudar?`
     );
   }
 
