@@ -32,6 +32,7 @@ const SYSTEM_PROMPT = `Você é a *Vanderleia*, a assistente de inteligência ar
 # Como conversar (seja gente, não robô):
 - Fale como uma pessoa de verdade conversando no WhatsApp: natural, calorosa e com jeito de quem é do interior, uma vizinha de confiança do campo. Use "tu" ou "você" de forma leve.
 - NADA de listas com marcadores, tópicos ou cara de menu de funções. Responda em frases soltas, como num papo de WhatsApp.
+- NÃO use markdown. O WhatsApp não entende "**", "#", nem listas com "-" ou "*". Escreva texto puro. Se quiser dar ênfase em algo (raramente), use só UM asterisco em volta da palavra, ex.: *adubo*.
 - Seja BREVE por padrão: 1 a 3 frases curtas. Só dê respostas longas se o produtor pedir detalhe, explicação ou um resumo completo.
 - Varie o jeito de falar, não repita as mesmas frases prontas. No máximo 1 emoji por mensagem — e nem sempre.
 - Chame o produtor pelo primeiro nome de vez em quando, de forma natural — não em toda mensagem, e nunca um nome que você não recebeu.
@@ -121,6 +122,24 @@ export interface AiReplyResult {
   transaction?: ExtractedTransaction;
 }
 
+/**
+ * Limpa formatação que o WhatsApp não renderiza (evita asteriscos e markdown
+ * aparecendo literais). O WhatsApp usa *um* asterisco para negrito; markdown usa
+ * dois. Aqui convertemos **x** -> *x* e removemos títulos e marcadores de lista.
+ */
+function formatForWhatsApp(text: string | null | undefined): string | undefined {
+  if (!text) return undefined;
+  const cleaned = text
+    .replace(/\*\*(.+?)\*\*/g, "*$1*")  // **negrito** (markdown) -> *negrito* (WhatsApp)
+    .replace(/\*\*/g, "")                // sobras de asteriscos duplos
+    .replace(/^#{1,6}\s+/gm, "")        // títulos markdown (###)
+    .replace(/^\s*[-•]\s+/gm, "")       // marcadores de lista ( - / • )
+    .replace(/^\s*\*\s+/gm, "")         // marcadores de lista com asterisco ( * item )
+    .replace(/\n{3,}/g, "\n\n")         // colapsa linhas em branco em excesso
+    .trim();
+  return cleaned || undefined;
+}
+
 export class AiService {
   private apiKey: string;
 
@@ -167,7 +186,7 @@ export class AiService {
     const choice = firstResponse.choices[0];
 
     if (choice.finish_reason !== "tool_calls" || !choice.message.tool_calls?.length) {
-      return { reply: choice.message.content ?? "Recebi sua mensagem! Como posso ajudar? 🌾" };
+      return { reply: formatForWhatsApp(choice.message.content) ?? "Recebi sua mensagem! Como posso ajudar? 🌾" };
     }
 
     // Processa TODOS os tool_calls retornados (OpenAI exige resposta para cada um)
@@ -250,7 +269,7 @@ export class AiService {
       ...toolResponses,
     ]);
 
-    const reply = secondResponse.choices[0].message.content ?? "Pronto! ✅";
+    const reply = formatForWhatsApp(secondResponse.choices[0].message.content) ?? "Pronto! ✅";
     return { reply, transaction };
   }
 
