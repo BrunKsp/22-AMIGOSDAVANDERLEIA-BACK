@@ -28,7 +28,7 @@ export class UazapService {
 
   async downloadMedia(messageKey: { remoteJid: string; fromMe: boolean; id: string }): Promise<Buffer> {
     const response = await this.client.post(
-      "/message/download",
+      "/message/download-media",
       { key: messageKey },
       { responseType: "arraybuffer" }
     );

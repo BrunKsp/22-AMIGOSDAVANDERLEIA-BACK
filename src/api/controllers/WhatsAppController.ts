@@ -30,9 +30,21 @@ export class WhatsAppController {
 
   async webhook(req: Request, res: Response): Promise<void> {
     res.sendStatus(200);
+    console.log("[webhook] payload completo:", JSON.stringify(req.body, null, 2));
+
     const payload = req.body as IUazapWebhookPayload;
-    const isAudio = payload?.message?.type === "audio" || payload?.message?.type === "ptt" || payload?.message?.mediaType === "audio";
-    if ((!payload?.message?.text && !isAudio) || payload.message.fromMe || payload.message.wasSentByApi || payload.message.isGroup) return;
+
+    if (payload?.event !== "messages.upsert") return;
+
+    const { key, message } = payload?.data ?? {};
+    if (!key || !message) return;
+    if (key.fromMe) return;
+
+    const isAudio = !!message.audioMessage;
+    const text = message.conversation || message.extendedTextMessage?.text;
+
+    if (!isAudio && !text) return;
+
     whatsAppService.handleWebhook(payload).catch((err) => {
       console.error("[webhook] Erro:", err.message);
     });

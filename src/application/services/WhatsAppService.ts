@@ -65,23 +65,19 @@ export class WhatsAppService {
   }
 
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
-    const { chat, message } = payload;
+    const { key, message, pushName, messageTimestamp } = payload.data;
 
-    if (message.fromMe || message.wasSentByApi) return;
+    const remoteJid = key.remoteJid;
+    const phone     = normalizePhone(remoteJid.replace("@s.whatsapp.net", "").replace("@c.us", ""));
+    const replyTo   = phone;
 
-    const phone   = normalizePhone(chat.wa_chatid.replace("@s.whatsapp.net", ""));
-    const replyTo = chat.wa_chatid.replace("@s.whatsapp.net", "");
-
-    const isAudio = message.type === "audio" || message.type === "ptt" || message.mediaType === "audio";
-
-    // Para texto, extrai o conteúdo bruto agora; para áudio, será preenchido após transcrição
-    let content = isAudio ? "" : (message.text || message.content || "").trim();
-    let transcribedText: string | null = null;
+    const isAudio = !!message.audioMessage;
+    let content = isAudio ? "" : (message.conversation || message.extendedTextMessage?.text || "").trim();
 
     if (!isAudio && !content) return;
 
     // Deduplicação por messageId
-    if (message.messageid && (await Message.exists({ messageId: message.messageid }))) {
+    if (key.id && (await Message.exists({ messageId: key.id }))) {
       return;
     }
 
@@ -91,34 +87,27 @@ export class WhatsAppService {
       { upsert: true, returnDocument: "after" }
     );
 
-    // Transcreve áudio antes de salvar a mensagem
+    // Transcreve áudio
     if (isAudio) {
       if (!this.transcription) {
         await this.uazap.sendText(replyTo, "⚠️ Transcrição de áudio não disponível no momento. Pode digitar sua mensagem?");
         return;
       }
       try {
-        const mimetype = message.mimetype?.split(";")[0] ?? "audio/ogg";
+        const audio    = message.audioMessage!;
+        const mimetype = audio.mimetype?.split(";")[0] ?? "audio/ogg";
         let audioBuffer: Buffer;
 
-        if (message.mediaBase64) {
-          // Uazap já envia o áudio em base64 no payload — caminho mais rápido
-          audioBuffer = Buffer.from(message.mediaBase64, "base64");
-        } else if (message.mediaUrl) {
-          // Fallback: URL pública para download
-          audioBuffer = await this.uazap.downloadMediaFromUrl(message.mediaUrl);
-        } else {
-          // Fallback: download via endpoint do Uazap usando a chave da mensagem
-          audioBuffer = await this.uazap.downloadMedia({
-            remoteJid: chat.wa_chatid,
-            fromMe:    message.fromMe,
-            id:        message.messageid,
-          });
-        }
+        // Tenta baixar via endpoint do Uazap usando a chave da mensagem
+        audioBuffer = await this.uazap.downloadMedia({
+          remoteJid,
+          fromMe: key.fromMe,
+          id:     key.id,
+        });
 
         console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes, mimetype: ${mimetype}`);
 
-        transcribedText = await this.transcription.transcribe(audioBuffer, mimetype);
+        const transcribedText = await this.transcription.transcribe(audioBuffer, mimetype);
         content = transcribedText.trim();
 
         if (!content) {
@@ -134,48 +123,46 @@ export class WhatsAppService {
       }
     }
 
-    // Salva mensagem inbound (com transcrição no content para áudio)
+    // Salva mensagem inbound
     try {
       await Message.create({
         conversationId: conversation._id,
-        messageId:      message.messageid,
+        messageId:      key.id,
         phoneNumber:    phone,
         userSlug:       conversation.userSlug,
         direction:      "inbound",
         type:           isAudio ? "audio" : "text",
         content,
-        rawPayload:     message as unknown as Record<string, unknown>,
-        sentAt:         new Date(message.messageTimestamp * 1000),
+        rawPayload:     payload.data as unknown as Record<string, unknown>,
+        sentAt:         messageTimestamp ? new Date(messageTimestamp * 1000) : new Date(),
       });
     } catch (err: any) {
-      if (err?.code === 11000) return; // duplicado por race condition
+      if (err?.code === 11000) return;
       throw err;
     }
 
     if (conversation.status !== "active") {
-      // Verifica se o usuário já tem o número verificado no Postgres
       const pgUser = await this.userRepository.findByPhone(phone);
 
       console.log(`[webhook] status=${conversation.status} phone=${phone} pgUser=${pgUser?.slug ?? "null"} phoneVerified=${pgUser?.phoneVerified ?? "null"}`);
 
       if (pgUser?.phoneVerified) {
-        // Ativa a conversa no Mongo e continua o fluxo normalmente
         await Conversation.findOneAndUpdate(
           { phoneNumber: phone },
           { userSlug: pgUser.slug, status: "active" }
         );
-        conversation.status  = "active";
+        conversation.status   = "active";
         conversation.userSlug = pgUser.slug;
       } else {
         await this.uazap.sendText(
           replyTo,
-          `Olá, ${chat.name ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
+          `Olá, ${pushName ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
         );
         return;
       }
     }
 
-    // Gera resposta da IA (com detecção de transação via function calling)
+    // Gera resposta da IA
     let aiReply: string;
     try {
       if (!this.ai) {
@@ -184,7 +171,6 @@ export class WhatsAppService {
         const result = await this.ai.generateReply(conversation._id, content, conversation.userSlug);
         aiReply = result.reply;
 
-        // Salva transação extraída pela IA
         if (result.transaction && conversation.userSlug) {
           try {
             await Transaction.create({
@@ -208,7 +194,7 @@ export class WhatsAppService {
       return;
     }
 
-    // Salva resposta outbound no histórico
+    // Salva resposta outbound
     await Message.create({
       conversationId: conversation._id,
       phoneNumber:    phone,
