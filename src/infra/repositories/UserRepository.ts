@@ -32,9 +32,10 @@ export class UserRepository implements IUserRepository {
 
   async findByPhone(phone: string): Promise<IUser | null> {
     const digits = phone.replace(/\D/g, "");
-    // Usa os últimos 8 dígitos (número local sem DDD/país) para busca tolerante
-    // a variações de formato entre o que o Uazap envia e o que o usuário cadastrou
-    const suffix = digits.slice(-8);
+    // Usa os últimos 11 dígitos (DDD + número completo) para tolerar diferenças
+    // de formato (com/sem +55) sem casar o usuário ERRADO — 8 dígitos colidiam
+    // entre números de DDDs diferentes e podiam vincular a conta errada.
+    const suffix = digits.slice(-11);
     return this.repo.findOneBy({ phone: Like(`%${suffix}`) });
   }
 

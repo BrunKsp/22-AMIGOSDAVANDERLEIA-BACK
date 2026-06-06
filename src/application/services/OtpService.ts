@@ -1,3 +1,4 @@
+import { randomInt } from "crypto";
 import { OtpToken } from "../../data/Infra.Documents/OtpToken";
 import { UazapService } from "../../external/whatsapp/services/UazapService";
 
@@ -54,6 +55,7 @@ export class OtpService {
   }
 
   private generateCode(): string {
-    return Math.floor(100_000 + Math.random() * 900_000).toString();
+    // código de 6 dígitos cripto-seguro
+    return randomInt(100_000, 1_000_000).toString();
   }
 }

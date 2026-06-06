@@ -40,7 +40,9 @@ export class FinanceiroService {
       query.category = filtros.categoria;
     }
     if (filtros.busca) {
-      query.description = { $regex: filtros.busca, $options: "i" };
+      // escapa metacaracteres para evitar regex injection / ReDoS
+      const termo = filtros.busca.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      query.description = { $regex: termo, $options: "i" };
     }
     if (filtros.mes) {
       const [ano, mes] = filtros.mes.split("-").map(Number);

@@ -3,6 +3,7 @@ import { plainToInstance } from "class-transformer";
 import { validate } from "class-validator";
 import { EstoqueService } from "../../application/services/EstoqueService";
 import { CreateEstoqueItemDto } from "../../application/dtos/CreateEstoqueItemDto";
+import { UpdateEstoqueItemDto } from "../../application/dtos/UpdateEstoqueItemDto";
 import { MovimentarEstoqueDto } from "../../application/dtos/MovimentarEstoqueDto";
 
 const service = new EstoqueService();
@@ -51,7 +52,13 @@ export class EstoqueController {
     try {
       const slugUsuario = req.params["slugUsuario"] as string;
       const id          = req.params["id"] as string;
-      const data = await service.atualizar(slugUsuario, id, req.body);
+      const dto = plainToInstance(UpdateEstoqueItemDto, req.body);
+      const errors = await validate(dto, { whitelist: true, forbidNonWhitelisted: true });
+      if (errors.length > 0) {
+        res.status(422).json({ message: "Erro de validação", errors });
+        return;
+      }
+      const data = await service.atualizar(slugUsuario, id, dto);
       res.json({ data });
     } catch (err: any) {
       res.status(400).json({ message: err.message });

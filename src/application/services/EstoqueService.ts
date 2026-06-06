@@ -1,6 +1,7 @@
 import { EstoqueItem } from "../../data/Infra.Documents/EstoqueItem";
 import { EstoqueMovimentacao } from "../../data/Infra.Documents/EstoqueMovimentacao";
 import { CreateEstoqueItemDto } from "../dtos/CreateEstoqueItemDto";
+import { UpdateEstoqueItemDto } from "../dtos/UpdateEstoqueItemDto";
 import { MovimentarEstoqueDto } from "../dtos/MovimentarEstoqueDto";
 
 export class EstoqueService {
@@ -26,10 +27,16 @@ export class EstoqueService {
     return EstoqueItem.create({ ...dto, userSlug });
   }
 
-  async atualizar(userSlug: string, id: string, dto: Partial<CreateEstoqueItemDto>) {
+  async atualizar(userSlug: string, id: string, dto: UpdateEstoqueItemDto) {
+    // só campos permitidos do DTO entram no $set (userSlug nunca é alterável aqui)
+    const update: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(dto)) {
+      if (v !== undefined) update[k] = v;
+    }
+
     const item = await EstoqueItem.findOneAndUpdate(
       { _id: id, userSlug },
-      { $set: dto },
+      { $set: update },
       { returnDocument: "after" }
     ).lean();
     if (!item) throw new Error("Item não encontrado");
@@ -43,16 +50,24 @@ export class EstoqueService {
   }
 
   async movimentar(userSlug: string, id: string, dto: MovimentarEstoqueDto) {
-    const item = await EstoqueItem.findOne({ _id: id, userSlug });
-    if (!item) throw new Error("Item não encontrado");
-
-    if (dto.tipo === "saida" && item.quantidade < dto.quantidade) {
-      throw new Error(`Quantidade insuficiente em estoque (disponível: ${item.quantidade} ${item.unidade})`);
-    }
-
     const delta = dto.tipo === "entrada" ? dto.quantidade : -dto.quantidade;
-    item.quantidade = Math.max(0, item.quantidade + delta);
-    await item.save();
+
+    // Atualização ATÔMICA: o filtro garante que a saída só ocorre se houver
+    // saldo suficiente, evitando estoque negativo e lost update em concorrência.
+    const filtro: Record<string, unknown> = { _id: id, userSlug };
+    if (dto.tipo === "saida") filtro.quantidade = { $gte: dto.quantidade };
+
+    const item = await EstoqueItem.findOneAndUpdate(
+      filtro,
+      { $inc: { quantidade: delta } },
+      { returnDocument: "after" }
+    );
+
+    if (!item) {
+      const existe = await EstoqueItem.findOne({ _id: id, userSlug }).lean();
+      if (!existe) throw new Error("Item não encontrado");
+      throw new Error(`Quantidade insuficiente em estoque (disponível: ${existe.quantidade} ${existe.unidade})`);
+    }
 
     await EstoqueMovimentacao.create({
       itemId:     item._id,
