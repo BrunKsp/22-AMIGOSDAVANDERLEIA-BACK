@@ -29,6 +29,7 @@ export class WhatsAppController {
   }
 
   async webhook(req: Request, res: Response): Promise<void> {
+    console.log("[webhook] payload recebido:", JSON.stringify(req.body, null, 2));
     res.sendStatus(200);
     const payload = req.body as IUazapWebhookPayload;
     whatsAppService.handleWebhook(payload).catch((err) => {
