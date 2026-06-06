@@ -31,7 +31,7 @@ export class WhatsAppController {
   async webhook(req: Request, res: Response): Promise<void> {
     res.sendStatus(200);
     const body = req.body;
-    console.log("[webhook]", JSON.stringify(body).slice(0, 400));
+    console.log("[webhook] FULL:", JSON.stringify(body, null, 2));
 
     const dataList = Array.isArray(body?.data) ? body.data : [body?.data];
     for (const data of dataList) {
