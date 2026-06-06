@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(curl -s http://localhost:3000/auth/me -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4YjQwNmFkYy1iMDIyLTQ5ZWEtODM4MC1iZDRjNmU0OWM2ZWMiLCJzbHVnIjoiSFdFbzBiQV9ROENYaUQ0a3p1WXpLdz09IiwiZW1haWwiOiJ2YW5kZXJsZWlhQG5vdm8uY29tIiwiaWF0IjoxNzgwNzA2ODM5LCJleHAiOjE3ODEzMTE2Mzl9.ZJQ1DzUfOtNRm9HaIb-g0OSzTKvXJoOwb37x1DHCD1Q')",
+      "Bash(curl -s http://localhost:3000/users/HWEo0bA_Q8CXiD4kzuYzKw== -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiI4YjQwNmFkYy1iMDIyLTQ5ZWEtODM4MC1iZDRjNmU0OWM2ZWMiLCJzbHVnIjoiSFdFbzBiQV9ROENYaUQ0a3p1WXpLdz09IiwiZW1haWwiOiJ2YW5kZXJsZWlhQG5vdm8uY29tIiwiaWF0IjoxNzgwNzA2ODM5LCJleHAiOjE3ODEzMTE2Mzl9.ZJQ1DzUfOtNRm9HaIb-g0OSzTKvXJoOwb37x1DHCD1Q')",
+      "Bash(curl -s -X POST http://localhost:3000/auth/login -H \"Content-Type: application/json\" -d \"{\\\\\"email\\\\\":\\\\\"vanderleia@novo.com\\\\\",\\\\\"password\\\\\":\\\\\"senha123\\\\\"}\")",
+      "Bash(python -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\('token gerado:', d['token'][:40]+'...'\\)\")",
+      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\data\\\\models\\\\User.ts\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\models\" -Recurse -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\services\\\\WhatsAppService.ts\" -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\services\\\\OtpService.ts\" -ErrorAction SilentlyContinue -Force)",
+      "Bash(Remove-Item \"c:\\\\Users\\\\bbrun\\\\OneDrive\\\\Documentos\\\\Projetos\\\\22-AMIGOSDAVANDERLEIA-BACK\\\\src\\\\external\\\\whatsapp\\\\controllers\" -Recurse -Force -ErrorAction SilentlyContinue)"
+    ]
+  }
+}

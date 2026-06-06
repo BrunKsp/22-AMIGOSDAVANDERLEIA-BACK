@@ -2,10 +2,14 @@ import "reflect-metadata";
 import "dotenv/config";
 import app from "./app";
 import { AppDataSource } from "./config/database";
+import { connectMongo } from "./external/whatsapp/config/mongo";
 
 const PORT = process.env.PORT ?? 3000;
 
-AppDataSource.initialize()
+Promise.all([
+  AppDataSource.initialize(),
+  connectMongo(),
+])
   .then(async () => {
     console.log("PostgreSQL conectado via TypeORM");
 
@@ -13,7 +17,7 @@ AppDataSource.initialize()
     if (pending) {
       console.log("Aplicando migrations pendentes...");
       await AppDataSource.runMigrations();
-      console.log("Migrations aplicadas com sucesso");
+      console.log("Migrations aplicadas");
     }
 
     app.listen(PORT, () => {
@@ -21,6 +25,6 @@ AppDataSource.initialize()
     });
   })
   .catch((err) => {
-    console.error("Falha na conexão com o banco:", err);
+    console.error("Falha na inicialização:", err);
     process.exit(1);
   });

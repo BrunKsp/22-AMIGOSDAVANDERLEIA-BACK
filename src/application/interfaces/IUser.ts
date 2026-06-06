@@ -8,6 +8,7 @@ export interface IUser {
   cpf: string;
   birthDate: Date;
   active: boolean;
+  phoneVerified: boolean;
   createdAt: Date;
   updatedAt: Date;
 }
@@ -36,8 +37,9 @@ export interface ICreateUserData {
 export interface IUpdateUserData {
   name?: string;
   email?: string;
-  password?: string;  
+  password?: string;
   phone?: string;
   birthDate?: Date;
   active?: boolean;
+  phoneVerified?: boolean;
 }

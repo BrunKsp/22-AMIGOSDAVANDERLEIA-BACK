@@ -1,6 +1,6 @@
 import { Repository } from "typeorm";
 import { AppDataSource } from "../../config/database";
-import { User } from "../../data/models/User";
+import { User } from "../../data/Infra.PG/User";
 import { IUserRepository, ICreateUserData, IUpdateUserData, IUser } from "../../application/interfaces/IUser";
 
 export class UserRepository implements IUserRepository {
