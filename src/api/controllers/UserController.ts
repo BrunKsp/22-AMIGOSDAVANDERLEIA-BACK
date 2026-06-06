@@ -5,12 +5,12 @@ import { UpdateUserDto } from "../../application/dtos/UpdateUserDto";
 const userService = new UserService();
 
 export class UserController {
-  async getAll(_req: Request, res: Response): Promise<void> {
+  async getMe(req: Request, res: Response): Promise<void> {
     try {
-      const users = await userService.getAll();
-      res.json({ data: users, total: users.length });
+      const user = await userService.getBySlug(req.user!.slug);
+      res.json({ data: user });
     } catch (err: any) {
-      res.status(500).json({ message: err.message });
+      res.status(404).json({ message: err.message });
     }
   }
 

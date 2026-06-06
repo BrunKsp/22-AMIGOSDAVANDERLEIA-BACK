@@ -8,9 +8,7 @@ import { IAuthResponse, ITokenPayload } from "../interfaces/IAuth";
 import { UserResponseDto } from "../dtos/UserResponseDto";
 import { generateSlug } from "../../shared/utils/generateSlug";
 import { normalizePhone } from "../../shared/utils/normalizePhone";
-
-const JWT_SECRET = process.env.JWT_SECRET ?? "changeme_secret";
-const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
+import { JWT_SECRET, JWT_EXPIRES_IN } from "../../config/secrets";
 
 export class AuthService {
   private userRepository: UserRepository;

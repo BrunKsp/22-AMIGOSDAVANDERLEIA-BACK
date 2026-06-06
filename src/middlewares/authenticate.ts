@@ -1,6 +1,7 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
 import { ITokenPayload } from "../application/interfaces/IAuth";
+import { JWT_SECRET } from "../config/secrets";
 
 declare global {
   namespace Express {
@@ -9,8 +10,6 @@ declare global {
     }
   }
 }
-
-const JWT_SECRET = process.env.JWT_SECRET ?? "changeme_secret";
 
 export function authenticate(req: Request, res: Response, next: NextFunction): void {
   const authHeader = req.headers.authorization;
@@ -23,7 +22,7 @@ export function authenticate(req: Request, res: Response, next: NextFunction): v
   const token = authHeader.slice(7);
 
   try {
-    const payload = jwt.verify(token, JWT_SECRET) as ITokenPayload;
+    const payload = jwt.verify(token, JWT_SECRET, { algorithms: ["HS256"] }) as ITokenPayload;
     req.user = payload;
     next();
   } catch {

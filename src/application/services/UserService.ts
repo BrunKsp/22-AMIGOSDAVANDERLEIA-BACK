@@ -10,11 +10,6 @@ export class UserService {
     this.userRepository = new UserRepository();
   }
 
-  async getAll(): Promise<UserResponseDto[]> {
-    const users = await this.userRepository.findAll();
-    return UserResponseDto.fromList(users);
-  }
-
   async getBySlug(slug: string): Promise<UserResponseDto> {
     const user = await this.userRepository.findBySlug(slug);
     if (!user) throw new Error("Usuário não encontrado");
