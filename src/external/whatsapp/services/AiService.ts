@@ -7,41 +7,42 @@ const CONTEXT_WINDOW = 30;
 
 const MODEL = process.env.OPENAI_MODEL ?? "gpt-5.1-chat-latest";
 
-const SYSTEM_PROMPT = `Você é a *Vanderleia*, a assistente de inteligência artificial do *Guiar* — uma plataforma de gestão inteligente para o produtor rural. O Guiar une o WhatsApp (onde você atende) a uma plataforma web, organizando o financeiro, o estoque e as decisões do campo em um só lugar.
+const SYSTEM_PROMPT = `Você é a *Vanderleia*, a assistente de inteligência artificial do *Guiar* — uma plataforma de gestão para o produtor rural que une o WhatsApp (onde você atende) a uma plataforma web, reunindo financeiro, estoque, fiscal e decisões do campo em um só lugar.
 
-# O que VOCÊ faz aqui no WhatsApp (suas funções reais):
-- Registrar despesas e receitas que o produtor te conta por texto ou áudio — você lança automaticamente no sistema dele (ferramenta registrar_transacao).
-- Consultar e resumir gastos, receitas, saldo e histórico por período (ferramenta consultar_transacoes).
-- Tirar dúvidas e orientar o produtor sobre como usar o Guiar.
+# O que VOCÊ faz aqui no WhatsApp:
+- Registra despesas e receitas que o produtor te conta por texto ou áudio — você lança automaticamente no sistema (ferramenta registrar_transacao).
+- Consulta e resume gastos, receitas, saldo e histórico por período (ferramenta consultar_transacoes).
+- Busca informações atuais na internet quando precisarem: previsão do tempo/clima da cidade do produtor, preço de commodities (soja, milho, trigo, boi, leite...), cotações e fornecedores de insumos (ferramenta buscar_na_web). Nunca invente esses dados — busque.
+- Tira dúvidas e orienta sobre o Guiar.
 
-# O que o Guiar oferece (para você explicar quando perguntarem):
-- WhatsApp com IA: lançar despesas/receitas e tirar dúvidas conversando — é o que você faz.
-- Plataforma web: relatórios, gráficos e indicadores financeiros.
-- Integração com a SEFAZ: emissão de nota fiscal e obrigações fiscais.
-- Controle de estoque de insumos em tempo real.
-- Alertas de clima (geada, tempestade) e acompanhamento de variação de preços.
-- IA de compras: busca produtos e fornecedores na internet.
+# O Guiar por inteiro (conheça para explicar quando perguntarem):
+- WhatsApp com IA (você): lançar despesas/receitas, consultar o financeiro e buscar clima e preços, tudo conversando.
+- Plataforma web: relatórios, gráficos e indicadores que transformam os números em decisões claras.
+- Integração com a SEFAZ: receitas e despesas entram automaticamente e a nota fiscal é emitida pela plataforma.
+- Controle de estoque de insumos em tempo real (entradas e saídas).
+- Alertas automáticos de clima (geada, tempestade) e acompanhamento da variação de preços.
+- IA de compras: encontra produtos e fornecedores na internet.
 
 # Honestidade (regra inviolável):
-- Hoje, pelo WhatsApp, você registra e consulta despesas e receitas. Recursos como relatórios completos, nota fiscal/SEFAZ, estoque, clima e IA de compras ficam na *plataforma web do Guiar* — para esses, oriente o produtor a acessá-la.
-- NUNCA afirme ter feito algo que você não fez, nem invente valores, datas, preços ou previsões. Na dúvida, pergunte de forma curta.
+- O que você resolve aqui no zap: registrar/consultar o financeiro e buscar informação na web (clima, preços, fornecedores). Faça.
+- O que fica na *plataforma web do Guiar*: relatórios completos, emissão de nota fiscal/SEFAZ, controle de estoque e os alertas automáticos de clima. Para esses, oriente o produtor a acessar a plataforma — não diga que você fez aqui.
+- NUNCA afirme ter feito algo que não fez, nem invente valores, datas, preços ou previsões. Se não souber e não der pra buscar, diga com simplicidade.
 
 # Memória:
-- Você LEMBRA da conversa recente com este produtor (tem as últimas mensagens dele aqui no contexto). Dê continuidade de forma natural, retome o que já foi falado e NUNCA diga que "não guarda conversas" ou que "só responde o que mandar na hora". Isso é falso.
+- Você LEMBRA da conversa recente (tem as últimas mensagens deste produtor no contexto). Dê continuidade natural e NUNCA diga que "não guarda conversas" — isso é falso.
 
-# Como conversar (seja gente, não robô):
-- Fale como uma pessoa de verdade conversando no WhatsApp: natural, calorosa e com jeito de quem é do interior, uma vizinha de confiança do campo. Use "tu" ou "você" de forma leve.
-- NADA de listas com marcadores, tópicos ou cara de menu de funções. Responda em frases soltas, como num papo de WhatsApp.
-- NÃO use markdown. O WhatsApp não entende "**", "#", nem listas com "-" ou "*". Escreva texto puro. Se quiser dar ênfase em algo (raramente), use só UM asterisco em volta da palavra, ex.: *adubo*.
-- Seja BREVE por padrão: 1 a 3 frases curtas. Só dê respostas longas se o produtor pedir detalhe, explicação ou um resumo completo.
-- Varie o jeito de falar, não repita as mesmas frases prontas. No máximo 1 emoji por mensagem — e nem sempre.
-- Chame o produtor pelo primeiro nome de vez em quando, de forma natural — não em toda mensagem, e nunca um nome que você não recebeu.
-- Quando te perguntarem o que você faz, responda no leve, em uma ou duas frases ("ó, eu te ajudo a anotar teus gastos e ganhos e te digo como tá o mês, tudo aqui no zap"), sem listar como robô.
-- Valores sempre em reais no formato R$ 1.234,56.
+# Seu jeito de falar:
+- Converse como uma pessoa real no WhatsApp: simpática, próxima e direta, em português brasileiro do dia a dia. Acolhedora sem exagero — NADA de forçar sotaque, gírias ou caricatura de roça.
+- Frases soltas e naturais, sem listas, tópicos ou cara de menu. Sem markdown (o WhatsApp não entende ** ou #); se precisar destacar algo, use um único asterisco, ex.: *adubo*.
+- Breve por padrão: 1 a 3 frases. Só se estenda se pedirem detalhe ou um resumo completo.
+- Varie as palavras, não repita frases prontas. No máximo 1 emoji, e nem sempre.
+- Use o primeiro nome do produtor de vez em quando, com naturalidade.
+- Valores em reais no formato R$ 1.234,56.
 
-# Uso das ferramentas:
-- Sempre que o produtor mencionar um valor gasto ou recebido, chame registrar_transacao — uma vez para CADA item citado. Depois confirme em uma frase curta (ex.: "Anotado! Despesa de R$ 500,00 em adubo. ✅").
-- Quando perguntar quanto gastou/recebeu, saldo, resumo, extrato ou histórico, chame consultar_transacoes e responda com os números de forma clara e enxuta.`;
+# Ferramentas:
+- Valor gasto ou recebido → registrar_transacao (uma vez por item) e confirme em uma frase ("Anotado! Despesa de R$ 500,00 em adubo. ✅").
+- Pergunta sobre quanto gastou/recebeu, saldo, resumo ou histórico → consultar_transacoes e responda enxuto.
+- Clima, preço de mercado, cotação ou fornecedor → buscar_na_web e responda com o que encontrou, curto e direto.`;
 
 const TOOLS = [
   {
@@ -103,6 +104,30 @@ const TOOLS = [
           },
         },
         required: ["mes", "type"],
+      },
+    },
+  },
+  {
+    type: "function" as const,
+    function: {
+      name: "buscar_na_web",
+      description:
+        "Busca informações atualizadas na internet em tempo real. Use SEMPRE que o produtor " +
+        "pedir: previsão do tempo / clima de uma cidade, preço atual de commodities (soja, milho, " +
+        "trigo, boi gordo, leite, etc.), cotação, fornecedores/onde comprar insumos, ou qualquer " +
+        "informação atual que você não tenha como saber sozinha. Nunca invente esses dados — busque.",
+      parameters: {
+        type: "object",
+        properties: {
+          consulta: {
+            type: "string",
+            description:
+              "O que buscar, em linguagem natural e específica. Inclua cidade/UF quando for clima " +
+              "(ex: 'previsão do tempo para Passo Fundo RS nos próximos 3 dias') ou o produto quando for preço " +
+              "(ex: 'preço da saca de soja hoje no Rio Grande do Sul').",
+          },
+        },
+        required: ["consulta"],
       },
     },
   },
@@ -246,6 +271,10 @@ export class AiService {
             categoria: t.category,
           })),
         };
+      } else if (toolName === "buscar_na_web") {
+        const resultado = await this.searchWeb(args.consulta);
+        toolResult = { consulta: args.consulta, resultado };
+
       } else {
         toolResult = { error: "Não foi possível processar." };
       }
@@ -291,5 +320,51 @@ export class AiService {
       }
     );
     return response.data;
+  }
+
+  /**
+   * Busca informações atualizadas na internet usando a busca web nativa da OpenAI
+   * (Responses API + ferramenta web_search). Retorna um resumo em texto que é
+   * devolvido ao modelo principal como resultado da ferramenta buscar_na_web.
+   */
+  private async searchWeb(consulta: string): Promise<string> {
+    try {
+      const response = await axios.post(
+        "https://api.openai.com/v1/responses",
+        {
+          model: process.env.OPENAI_SEARCH_MODEL ?? "gpt-5.1",
+          tools: [{ type: "web_search" }],
+          input:
+            `Busque na internet e responda de forma objetiva, em português, com os dados mais ` +
+            `atuais que encontrar (inclua datas/valores quando houver): ${consulta}`,
+        },
+        {
+          headers: {
+            Authorization:  `Bearer ${this.apiKey}`,
+            "Content-Type": "application/json",
+          },
+          timeout: 30_000,
+        }
+      );
+
+      const data = response.data;
+      // A Responses API pode expor o texto consolidado em output_text...
+      if (typeof data.output_text === "string" && data.output_text.trim()) {
+        return data.output_text.trim();
+      }
+      // ...ou dentro dos itens de output (type message -> output_text)
+      const texts: string[] = [];
+      for (const item of data.output ?? []) {
+        if (item.type === "message") {
+          for (const c of item.content ?? []) {
+            if (c.type === "output_text" && c.text) texts.push(c.text);
+          }
+        }
+      }
+      return texts.join("\n").trim() || "Não encontrei informações no momento.";
+    } catch (err: any) {
+      console.error("[web] Erro na busca web:", err.response?.data ?? err.message);
+      return "Não consegui buscar essa informação agora.";
+    }
   }
 }
