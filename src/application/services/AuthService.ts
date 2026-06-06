@@ -7,6 +7,7 @@ import { LoginDto } from "../dtos/LoginDto";
 import { IAuthResponse, ITokenPayload } from "../interfaces/IAuth";
 import { UserResponseDto } from "../dtos/UserResponseDto";
 import { generateSlug } from "../../shared/utils/generateSlug";
+import { normalizePhone } from "../../shared/utils/normalizePhone";
 
 const JWT_SECRET = process.env.JWT_SECRET ?? "changeme_secret";
 const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
@@ -33,7 +34,7 @@ export class AuthService {
       name: dto.name,
       email: dto.email,
       password: passwordHash,
-      phone: dto.phone,
+      phone: normalizePhone(dto.phone),
       cpf: dto.cpf,
       birthDate: new Date(dto.birthDate),
       slug: generateSlug(),

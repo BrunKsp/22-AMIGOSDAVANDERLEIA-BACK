@@ -1,6 +1,7 @@
 import { UserRepository } from "../../infra/repositories/UserRepository";
 import { UpdateUserDto } from "../dtos/UpdateUserDto";
 import { UserResponseDto } from "../dtos/UserResponseDto";
+import { normalizePhone } from "../../shared/utils/normalizePhone";
 
 export class UserService {
   private userRepository: UserRepository;
@@ -31,6 +32,7 @@ export class UserService {
 
     const updated = await this.userRepository.update(slug, {
       ...dto,
+      phone: dto.phone ? normalizePhone(dto.phone) : undefined,
       birthDate: dto.birthDate ? new Date(dto.birthDate) : undefined,
     });
 

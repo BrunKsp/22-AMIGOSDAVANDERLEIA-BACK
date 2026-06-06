@@ -7,11 +7,7 @@ import { TranscriptionService } from "../../external/whatsapp/services/Transcrip
 import { Conversation } from "../../data/Infra.Documents/Conversation";
 import { Message } from "../../data/Infra.Documents/Message";
 import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsApp";
-
-function normalizePhone(phone: string): string {
-  const digits = phone.replace(/\D/g, "");
-  return digits.startsWith("55") ? digits : `55${digits}`;
-}
+import { normalizePhone } from "../../shared/utils/normalizePhone";
 
 export class WhatsAppService {
   private otpService     = new OtpService();
@@ -54,7 +50,7 @@ export class WhatsAppService {
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
     const { chat, message } = payload;
 
-    const phone   = normalizePhone(chat.phone);
+    const phone   = normalizePhone(chat.wa_chatid.replace("@s.whatsapp.net", ""));
     const content = (message.text || message.content || "").trim();
     if (!content) return;
 
