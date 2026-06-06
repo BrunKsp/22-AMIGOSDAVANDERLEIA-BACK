@@ -1,4 +1,4 @@
-import { Repository, In } from "typeorm";
+import { Repository, Like } from "typeorm";
 import { AppDataSource } from "../../config/database";
 import { User } from "../../data/Infra.PG/User";
 import { IUserRepository, ICreateUserData, IUpdateUserData, IUser } from "../../application/interfaces/IUser";
@@ -32,19 +32,10 @@ export class UserRepository implements IUserRepository {
 
   async findByPhone(phone: string): Promise<IUser | null> {
     const digits = phone.replace(/\D/g, "");
-    // Tenta as variações: +5551..., 5551..., e com/sem 9º dígito
-    const candidates = [
-      phone,
-      `+${digits}`,
-      digits,
-    ];
-    // Adiciona variante sem o 9º dígito (área 2 dígitos + 8 dígitos)
-    if (digits.length === 13) {
-      // ex: 5551999978307 → 551978307 (remove o 9 depois do DDD)
-      const sem9 = digits.slice(0, 4) + digits.slice(5);
-      candidates.push(`+${sem9}`, sem9);
-    }
-    return this.repo.findOneBy({ phone: In([...new Set(candidates)]) });
+    // Usa os últimos 8 dígitos (número local sem DDD/país) para busca tolerante
+    // a variações de formato entre o que o Uazap envia e o que o usuário cadastrou
+    const suffix = digits.slice(-8);
+    return this.repo.findOneBy({ phone: Like(`%${suffix}`) });
   }
 
   async create(data: ICreateUserData): Promise<IUser> {
