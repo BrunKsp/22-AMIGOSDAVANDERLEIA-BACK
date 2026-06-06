@@ -35,13 +35,13 @@ export class UserRepository implements IUserRepository {
     return this.repo.save(user);
   }
 
-  async update(id: string, data: IUpdateUserData): Promise<IUser | null> {
-    await this.repo.update(id, data as Partial<User>);
-    return this.findById(id);
+  async update(slug: string, data: IUpdateUserData): Promise<IUser | null> {
+    await this.repo.update({ slug }, data as Partial<User>);
+    return this.findBySlug(slug);
   }
 
-  async delete(id: string): Promise<boolean> {
-    const result = await this.repo.delete(id);
+  async delete(slug: string): Promise<boolean> {
+    const result = await this.repo.delete({ slug });
     return (result.affected ?? 0) > 0;
   }
 }

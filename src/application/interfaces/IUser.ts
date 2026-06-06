@@ -3,6 +3,7 @@ export interface IUser {
   slug: string;
   name: string;
   email: string;
+  password: string;
   phone: string;
   cpf: string;
   birthDate: Date;
@@ -18,13 +19,14 @@ export interface IUserRepository {
   findByEmail(email: string): Promise<IUser | null>;
   findByCpf(cpf: string): Promise<IUser | null>;
   create(data: ICreateUserData): Promise<IUser>;
-  update(id: string, data: IUpdateUserData): Promise<IUser | null>;
-  delete(id: string): Promise<boolean>;
+  update(slug: string, data: IUpdateUserData): Promise<IUser | null>;
+  delete(slug: string): Promise<boolean>;
 }
 
 export interface ICreateUserData {
   name: string;
   email: string;
+  password: string;
   phone: string;
   cpf: string;
   birthDate: Date;
@@ -34,6 +36,7 @@ export interface ICreateUserData {
 export interface IUpdateUserData {
   name?: string;
   email?: string;
+  password?: string;  
   phone?: string;
   birthDate?: Date;
   active?: boolean;

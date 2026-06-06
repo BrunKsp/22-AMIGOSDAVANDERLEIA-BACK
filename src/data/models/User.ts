@@ -21,6 +21,9 @@ export class User implements IUser {
   @Column({ unique: true, length: 150 })
   email!: string;
 
+  @Column({ name: "password", length: 255 })
+  password!: string;
+
   @Column({ length: 20 })
   phone!: string;
 

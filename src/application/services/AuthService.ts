@@ -1,0 +1,76 @@
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { UserRepository } from "../../infra/repositories/UserRepository";
+import { RegisterDto } from "../dtos/RegisterDto";
+import { LoginDto } from "../dtos/LoginDto";
+import { IAuthResponse, ITokenPayload } from "../interfaces/IAuth";
+import { UserResponseDto } from "../dtos/UserResponseDto";
+import { generateSlug } from "../../shared/utils/generateSlug";
+
+const JWT_SECRET = process.env.JWT_SECRET ?? "changeme_secret";
+const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
+
+export class AuthService {
+  private userRepository: UserRepository;
+
+  constructor() {
+    this.userRepository = new UserRepository();
+  }
+
+  async register(dto: RegisterDto): Promise<IAuthResponse> {
+    const emailExists = await this.userRepository.findByEmail(dto.email);
+    if (emailExists) throw new Error("Email já está em uso");
+
+    const cpfExists = await this.userRepository.findByCpf(dto.cpf);
+    if (cpfExists) throw new Error("CPF já cadastrado");
+
+    const passwordHash = await bcrypt.hash(dto.password, 10);
+
+    const user = await this.userRepository.create({
+      name: dto.name,
+      email: dto.email,
+      password: passwordHash,
+      phone: dto.phone,
+      cpf: dto.cpf,
+      birthDate: new Date(dto.birthDate),
+      slug: generateSlug(),
+    });
+
+    return this.buildAuthResponse(user.id, user.slug, user.email, user.name);
+  }
+
+  async login(dto: LoginDto): Promise<IAuthResponse> {
+    const user = await this.userRepository.findByEmail(dto.email);
+    if (!user) throw new Error("Credenciais inválidas");
+
+    if (!user.active) throw new Error("Conta desativada");
+
+    const passwordMatch = await bcrypt.compare(dto.password, user.password);
+    if (!passwordMatch) throw new Error("Credenciais inválidas");
+
+    return this.buildAuthResponse(user.id, user.slug, user.email, user.name);
+  }
+
+  async me(payload: ITokenPayload): Promise<UserResponseDto> {
+    const user = await this.userRepository.findBySlug(payload.slug);
+    if (!user) throw new Error("Usuário não encontrado");
+    return UserResponseDto.fromEntity(user);
+  }
+
+  private buildAuthResponse(
+    id: string,
+    slug: string,
+    email: string,
+    name: string
+  ): IAuthResponse {
+    const payload: ITokenPayload = { sub: id, slug, email };
+    const token = jwt.sign(payload, JWT_SECRET, { expiresIn: JWT_EXPIRES_IN } as jwt.SignOptions);
+
+    return {
+      token,
+      type: "Bearer",
+      expiresIn: JWT_EXPIRES_IN,
+      user: { slug, name, email },
+    };
+  }
+}
