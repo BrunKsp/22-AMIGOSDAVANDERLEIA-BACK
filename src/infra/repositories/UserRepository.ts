@@ -1,4 +1,4 @@
-import { Repository } from "typeorm";
+import { Repository, In } from "typeorm";
 import { AppDataSource } from "../../config/database";
 import { User } from "../../data/Infra.PG/User";
 import { IUserRepository, ICreateUserData, IUpdateUserData, IUser } from "../../application/interfaces/IUser";
@@ -31,7 +31,20 @@ export class UserRepository implements IUserRepository {
   }
 
   async findByPhone(phone: string): Promise<IUser | null> {
-    return this.repo.findOneBy({ phone });
+    const digits = phone.replace(/\D/g, "");
+    // Tenta as variações: +5551..., 5551..., e com/sem 9º dígito
+    const candidates = [
+      phone,
+      `+${digits}`,
+      digits,
+    ];
+    // Adiciona variante sem o 9º dígito (área 2 dígitos + 8 dígitos)
+    if (digits.length === 13) {
+      // ex: 5551999978307 → 551978307 (remove o 9 depois do DDD)
+      const sem9 = digits.slice(0, 4) + digits.slice(5);
+      candidates.push(`+${sem9}`, sem9);
+    }
+    return this.repo.findOneBy({ phone: In([...new Set(candidates)]) });
   }
 
   async create(data: ICreateUserData): Promise<IUser> {

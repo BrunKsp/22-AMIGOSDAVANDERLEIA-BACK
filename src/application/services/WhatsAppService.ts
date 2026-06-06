@@ -121,9 +121,10 @@ export class WhatsAppService {
     }
 
     if (conversation.status !== "active") {
-      // Verifica se o usuário já tem o número verificado no Postgres (pode ter verificado
-      // por outro caminho e a conversa no Mongo ainda não foi ativada)
+      // Verifica se o usuário já tem o número verificado no Postgres
       const pgUser = await this.userRepository.findByPhone(phone);
+
+      console.log(`[webhook] status=${conversation.status} phone=${phone} pgUser=${pgUser?.slug ?? "null"} phoneVerified=${pgUser?.phoneVerified ?? "null"}`);
 
       if (pgUser?.phoneVerified) {
         // Ativa a conversa no Mongo e continua o fluxo normalmente
