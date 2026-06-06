@@ -21,6 +21,9 @@ const MessageSchema = new Schema<IMessageDocument>(
 );
 
 MessageSchema.index({ conversationId: 1, sentAt: -1 });
+// Histórico da IA é ordenado por createdAt (hora real de inserção), pois sentAt
+// vem do provedor e pode chegar corrompido. Ver AiService.generateReply.
+MessageSchema.index({ conversationId: 1, createdAt: -1 });
 MessageSchema.index({ messageId: 1 }, { unique: true, sparse: true });
 
 export const Message = model<IMessageDocument>("Message", MessageSchema);

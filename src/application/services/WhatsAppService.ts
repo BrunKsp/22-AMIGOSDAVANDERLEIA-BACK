@@ -107,7 +107,12 @@ export class WhatsAppService {
         type:           isAudio ? "audio" : "text",
         content:        isAudio ? "[áudio]" : content,
         rawPayload:     message as unknown as Record<string, unknown>,
-        sentAt:         message.messageTimestamp ? new Date(message.messageTimestamp * 1000) : new Date(),
+        // messageTimestamp pode vir em segundos (~1.7e9) ou milissegundos (~1.7e12).
+        // Esta instância do Uazapi manda em ms; multiplicar por 1000 gerava datas no
+        // ano ~58000. Normaliza para ms antes de criar a Date.
+        sentAt:         message.messageTimestamp
+          ? new Date(message.messageTimestamp < 1e12 ? message.messageTimestamp * 1000 : message.messageTimestamp)
+          : new Date(),
       });
     } catch (err: any) {
       if (err?.code === 11000) return; // duplicado / corrida

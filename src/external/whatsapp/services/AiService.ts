@@ -203,8 +203,13 @@ export class AiService {
     userSlug?: string,
     userName?: string
   ): Promise<AiReplyResult> {
+    // Ordena por createdAt (hora real de inserção no banco), NÃO por sentAt.
+    // sentAt vem do messageTimestamp do provedor e pode chegar corrompido (datas
+    // no ano ~58000); isso jogava todas as mensagens inbound para o topo e expulsava
+    // as respostas da IA da janela de contexto — a IA não via o próprio histórico e
+    // cumprimentava a cada mensagem. createdAt intercala inbound/outbound corretamente.
     const history = await Message.find({ conversationId })
-      .sort({ sentAt: -1 })
+      .sort({ createdAt: -1 })
       .limit(CONTEXT_WINDOW)
       .lean();
 
