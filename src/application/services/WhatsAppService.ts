@@ -72,7 +72,7 @@ export class WhatsAppService {
     const phone   = normalizePhone(chat.wa_chatid.replace("@s.whatsapp.net", ""));
     const replyTo = chat.wa_chatid.replace("@s.whatsapp.net", "");
 
-    const isAudio = message.type === "audio" || message.mediaType === "audio";
+    const isAudio = message.type === "audio" || message.type === "ptt" || message.mediaType === "audio";
 
     // Para texto, extrai o conteúdo bruto agora; para áudio, será preenchido após transcrição
     let content = isAudio ? "" : (message.text || message.content || "").trim();
