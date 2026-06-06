@@ -1,18 +1,11 @@
 import axios, { AxiosInstance } from "axios";
 
-interface SendTextPayload {
-  number: string;
-  text: string;
-}
-
 export class UazapService {
   private client: AxiosInstance;
-  private instance: string;
 
   constructor() {
-    const baseUrl  = process.env.UAZAP_BASE_URL;
-    const token    = process.env.UAZAP_TOKEN;
-    this.instance  = process.env.UAZAP_INSTANCE ?? "";
+    const baseUrl = process.env.UAZAP_BASE_URL;
+    const token   = process.env.UAZAP_TOKEN;
 
     if (!baseUrl || !token) throw new Error("UAZAP_BASE_URL e UAZAP_TOKEN são obrigatórios");
 
@@ -27,12 +20,19 @@ export class UazapService {
   }
 
   async sendText(phoneNumber: string, text: string): Promise<void> {
-    const payload: SendTextPayload = {
+    await this.client.post("/send/text", {
       number: this.normalizePhone(phoneNumber),
       text,
-    };
+    });
+  }
 
-    await this.client.post(`/message/sendText/${this.instance}`, payload);
+  async downloadMedia(messageKey: { remoteJid: string; fromMe: boolean; id: string }): Promise<Buffer> {
+    const response = await this.client.post(
+      "/message/download",
+      { key: messageKey },
+      { responseType: "arraybuffer" }
+    );
+    return Buffer.from(response.data);
   }
 
   private normalizePhone(phone: string): string {

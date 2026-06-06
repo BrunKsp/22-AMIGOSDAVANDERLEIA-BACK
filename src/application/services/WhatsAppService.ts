@@ -3,14 +3,16 @@ import { User } from "../../data/Infra.PG/User";
 import { OtpService } from "./OtpService";
 import { UazapService } from "../../external/whatsapp/services/UazapService";
 import { AiService } from "../../external/whatsapp/services/AiService";
+import { TranscriptionService } from "../../external/whatsapp/services/TranscriptionService";
 import { Conversation } from "../../data/Infra.Documents/Conversation";
 import { Message } from "../../data/Infra.Documents/Message";
 import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsApp";
 
 export class WhatsAppService {
-  private otpService = new OtpService();
-  private uazap      = new UazapService();
-  private ai         = new AiService();
+  private otpService     = new OtpService();
+  private uazap          = new UazapService();
+  private ai             = new AiService();
+  private transcription  = process.env.OPENAI_API_KEY ? new TranscriptionService() : null;
 
   async sendOtp(userSlug: string): Promise<string> {
     const userRepo = AppDataSource.getRepository(User);
@@ -48,7 +50,7 @@ export class WhatsAppService {
     if (data.key.fromMe) return;
 
     const phone   = data.key.remoteJid.replace("@s.whatsapp.net", "");
-    const content = this.extractText(payload);
+    const content = await this.extractContent(payload);
     if (!content) return;
 
     const conversation = await Conversation.findOneAndUpdate(
@@ -57,12 +59,14 @@ export class WhatsAppService {
       { upsert: true, new: true }
     );
 
+    const isAudio = !!payload.data.message?.audioMessage;
+
     await Message.create({
       conversationId: conversation._id,
       phoneNumber: phone,
       userSlug: conversation.userSlug,
       direction: "inbound",
-      type: "text",
+      type: isAudio ? "audio" : "text",
       content,
       rawPayload: data as unknown as Record<string, unknown>,
       sentAt: new Date(data.messageTimestamp * 1000),
@@ -91,8 +95,22 @@ export class WhatsAppService {
     await this.uazap.sendText(phone, aiReply);
   }
 
-  private extractText(payload: IUazapWebhookPayload): string {
+  private async extractContent(payload: IUazapWebhookPayload): Promise<string> {
     const msg = payload.data.message;
+
+    if (msg?.audioMessage) {
+      if (!this.transcription) return "";
+      try {
+        const audioBuffer = await this.uazap.downloadMedia(payload.data.key);
+        const mimetype = msg.audioMessage.mimetype ?? "audio/ogg";
+        const transcribed = await this.transcription.transcribe(audioBuffer, mimetype);
+        return transcribed.trim();
+      } catch (err: any) {
+        console.error("[transcription] Erro ao transcrever áudio:", err.message);
+        return "";
+      }
+    }
+
     return (
       msg?.conversation ??
       msg?.extendedTextMessage?.text ??

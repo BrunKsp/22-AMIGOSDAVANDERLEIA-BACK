@@ -43,6 +43,12 @@ export interface IUazapWebhookPayload {
       conversation?: string;
       extendedTextMessage?: { text: string };
       imageMessage?: { caption?: string };
+      audioMessage?: {
+        url?: string;
+        mimetype?: string;
+        seconds?: number;
+        ptt?: boolean;
+      };
     };
     messageType: string;
     messageTimestamp: number;
