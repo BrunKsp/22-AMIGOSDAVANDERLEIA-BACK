@@ -92,6 +92,10 @@ export class WhatsAppService {
       { upsert: true, returnDocument: "after" }
     );
 
+    // Mostra "digitando..." enquanto processa (transcrição + IA).
+    // É cancelado automaticamente quando a resposta é enviada.
+    await this.uazap.sendPresence(replyTo, "composing");
+
     // Transcreve áudio antes de salvar a mensagem
     if (isAudio) {
       if (!this.transcription) {

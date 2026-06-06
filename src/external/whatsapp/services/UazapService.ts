@@ -26,6 +26,28 @@ export class UazapService {
     });
   }
 
+  /**
+   * Mostra "digitando..." (ou "gravando áudio...") para o contato.
+   * A presença é cancelada automaticamente quando uma mensagem é enviada ao
+   * mesmo chat. Não lança erro para não atrapalhar o fluxo principal.
+   * Doc: POST /message/presence { number, presence, delay }
+   */
+  async sendPresence(
+    phoneNumber: string,
+    presence: "composing" | "recording" | "paused" = "composing",
+    delayMs = 30_000
+  ): Promise<void> {
+    try {
+      await this.client.post("/message/presence", {
+        number: this.normalizePhone(phoneNumber),
+        presence,
+        delay: delayMs,
+      });
+    } catch (err: any) {
+      console.warn("[presence] Falha ao enviar presença:", err.response?.data ?? err.message);
+    }
+  }
+
   // Baixa a mídia de uma mensagem pelo endpoint oficial do Uazapi.
   // Doc: POST /message/download  body { id, return_base64, generate_mp3 }
   async downloadMedia(messageId: string): Promise<Buffer> {
