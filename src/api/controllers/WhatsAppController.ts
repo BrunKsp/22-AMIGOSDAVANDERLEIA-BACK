@@ -30,10 +30,14 @@ export class WhatsAppController {
 
   async webhook(req: Request, res: Response): Promise<void> {
     res.sendStatus(200);
-    const payload = req.body as IUazapWebhookPayload;
-    if (!payload?.data?.from || !payload?.data?.body) return;
-    whatsAppService.handleWebhook(payload).catch((err) => {
-      console.error("[webhook] Erro:", err.message);
-    });
+    const body = req.body;
+    console.log("[webhook]", JSON.stringify(body).slice(0, 400));
+
+    const dataList = Array.isArray(body?.data) ? body.data : [body?.data];
+    for (const data of dataList) {
+      if (!data) continue;
+      whatsAppService.handleWebhook({ event: body.event, instance: body.instance, data })
+        .catch((err) => console.error("[webhook] Erro:", err.message));
+    }
   }
 }

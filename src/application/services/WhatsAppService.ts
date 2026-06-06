@@ -54,11 +54,27 @@ export class WhatsAppService {
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
     const { data } = payload;
 
-    const phone   = normalizePhone(data.from);
-    const content = data.body?.trim();
+    // Suporta formato simples {from, body} e Evolution API {key.remoteJid, message}
+    const fromRaw = data.from ?? data.key?.remoteJid ?? "";
+    if (!fromRaw) return;
+
+    const phone = normalizePhone(fromRaw.replace("@s.whatsapp.net", ""));
+
+    // Ignora mensagens enviadas pelo próprio bot
+    if (data.key?.fromMe === true) return;
+
+    const content = (
+      data.body ??
+      data.message?.conversation ??
+      data.message?.extendedTextMessage?.text ??
+      data.message?.imageMessage?.caption ??
+      ""
+    ).trim();
     if (!content) return;
 
-    const isAudio = data.type === "audio" || data.mimetype?.includes("audio");
+    const isAudio = data.type === "audio" ||
+      data.mimetype?.includes("audio") ||
+      !!data.message?.audioMessage;
 
     const conversation = await Conversation.findOneAndUpdate(
       { phoneNumber: phone },
@@ -73,8 +89,8 @@ export class WhatsAppService {
       direction: "inbound",
       type: isAudio ? "audio" : "text",
       content,
-      rawPayload: data as unknown as Record<string, unknown>,
-      sentAt: new Date(data.timestamp * 1000),
+      rawPayload: data as Record<string, unknown>,
+      sentAt: data.timestamp ? new Date(data.timestamp * 1000) : new Date(),
     });
 
     if (conversation.status !== "active") {

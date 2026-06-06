@@ -32,13 +32,6 @@ export interface IOtpToken {
 
 export interface IUazapWebhookPayload {
   event: string;
-  instance: string;
-  data: {
-    from: string;
-    body: string;
-    timestamp: number;
-    type?: string;
-    mimetype?: string;
-    pushName?: string;
-  };
+  instance?: string;
+  data: Record<string, any>;
 }
