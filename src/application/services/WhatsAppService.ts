@@ -51,13 +51,13 @@ export class WhatsAppService {
     const { chat, message } = payload;
 
     const phone   = normalizePhone(chat.wa_chatid.replace("@s.whatsapp.net", ""));
+    const replyTo = chat.wa_chatid.replace("@s.whatsapp.net", "");
     const content = (message.text || message.content || "").trim();
     if (!content) return;
 
-    // Deduplicação: ignora mensagem já processada
-    if (message.messageid) {
-      const exists = await Message.exists({ messageId: message.messageid });
-      if (exists) return;
+    // Deduplicação rápida: a UazAPI reenvia o mesmo evento mais de uma vez
+    if (message.messageid && (await Message.exists({ messageId: message.messageid }))) {
+      return;
     }
 
     const isAudio = message.type === "audio" || message.mediaType === "audio";
@@ -68,21 +68,28 @@ export class WhatsAppService {
       { upsert: true, returnDocument: "after" }
     );
 
-    await Message.create({
-      conversationId: conversation._id,
-      messageId: message.messageid,
-      phoneNumber: phone,
-      userSlug: conversation.userSlug,
-      direction: "inbound",
-      type: isAudio ? "audio" : "text",
-      content,
-      rawPayload: message as unknown as Record<string, unknown>,
-      sentAt: new Date(message.messageTimestamp),
-    });
+    // O índice único em messageId garante que dois webhooks simultâneos
+    // não gerem resposta duplicada (race condition).
+    try {
+      await Message.create({
+        conversationId: conversation._id,
+        messageId: message.messageid,
+        phoneNumber: phone,
+        userSlug: conversation.userSlug,
+        direction: "inbound",
+        type: isAudio ? "audio" : "text",
+        content,
+        rawPayload: message as unknown as Record<string, unknown>,
+        sentAt: new Date(message.messageTimestamp),
+      });
+    } catch (err: any) {
+      if (err?.code === 11000) return; // duplicado: outro webhook já processou
+      throw err;
+    }
 
     if (conversation.status !== "active") {
       await this.uazap.sendText(
-        phone,
+        replyTo,
         `Olá, ${chat.name ?? "produtor"}! 👋\n\nPara conversar comigo você precisa vincular este número na plataforma.\n\nAcesse → Configurações → "Vincular WhatsApp".`
       );
       return;
@@ -109,7 +116,7 @@ export class WhatsAppService {
     });
 
     try {
-      await this.uazap.sendText(phone, aiReply);
+      await this.uazap.sendText(replyTo, aiReply);
     } catch (err: any) {
       console.error("[uazap] Erro ao enviar mensagem:", err.response?.data ?? err.message);
     }
