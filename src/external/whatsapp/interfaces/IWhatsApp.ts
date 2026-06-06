@@ -34,24 +34,11 @@ export interface IUazapWebhookPayload {
   event: string;
   instance: string;
   data: {
-    key: {
-      remoteJid: string;
-      fromMe: boolean;
-      id: string;
-    };
-    message?: {
-      conversation?: string;
-      extendedTextMessage?: { text: string };
-      imageMessage?: { caption?: string };
-      audioMessage?: {
-        url?: string;
-        mimetype?: string;
-        seconds?: number;
-        ptt?: boolean;
-      };
-    };
-    messageType: string;
-    messageTimestamp: number;
+    from: string;
+    body: string;
+    timestamp: number;
+    type?: string;
+    mimetype?: string;
     pushName?: string;
   };
 }

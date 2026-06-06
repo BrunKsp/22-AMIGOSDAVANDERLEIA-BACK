@@ -47,35 +47,34 @@ export class WhatsAppService {
 
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
     const { data } = payload;
-    if (data.key.fromMe) return;
 
-    const phone   = data.key.remoteJid.replace("@s.whatsapp.net", "");
-    const content = await this.extractContent(payload);
+    const phone   = data.from.replace(/\D/g, "").replace(/^55/, "");
+    const content = data.body?.trim();
     if (!content) return;
 
+    const isAudio = data.type === "audio" || data.mimetype?.includes("audio");
+
     const conversation = await Conversation.findOneAndUpdate(
-      { phoneNumber: phone },
+      { phoneNumber: data.from },
       { lastMessageAt: new Date() },
       { upsert: true, new: true }
     );
 
-    const isAudio = !!payload.data.message?.audioMessage;
-
     await Message.create({
       conversationId: conversation._id,
-      phoneNumber: phone,
+      phoneNumber: data.from,
       userSlug: conversation.userSlug,
       direction: "inbound",
       type: isAudio ? "audio" : "text",
       content,
       rawPayload: data as unknown as Record<string, unknown>,
-      sentAt: new Date(data.messageTimestamp * 1000),
+      sentAt: new Date(data.timestamp * 1000),
     });
 
     if (conversation.status !== "active") {
       await this.uazap.sendText(
-        phone,
-        `Olá! Para conversar comigo você precisa vincular este número na plataforma *Amigos da Vanderleia*.\n\nAcesse a plataforma → Perfil → "Vincular WhatsApp".`
+        data.from,
+        `Olá! Para conversar comigo você precisa vincular este número na plataforma.\n\nAcesse a plataforma → Configurações → "Vincular WhatsApp".`
       );
       return;
     }
@@ -86,7 +85,7 @@ export class WhatsAppService {
 
     await Message.create({
       conversationId: conversation._id,
-      phoneNumber: phone,
+      phoneNumber: data.from,
       userSlug: conversation.userSlug,
       direction: "outbound",
       type: "text",
@@ -94,30 +93,6 @@ export class WhatsAppService {
       sentAt: new Date(),
     });
 
-    await this.uazap.sendText(phone, aiReply);
-  }
-
-  private async extractContent(payload: IUazapWebhookPayload): Promise<string> {
-    const msg = payload.data.message;
-
-    if (msg?.audioMessage) {
-      if (!this.transcription) return "";
-      try {
-        const audioBuffer = await this.uazap.downloadMedia(payload.data.key);
-        const mimetype = msg.audioMessage.mimetype ?? "audio/ogg";
-        const transcribed = await this.transcription.transcribe(audioBuffer, mimetype);
-        return transcribed.trim();
-      } catch (err: any) {
-        console.error("[transcription] Erro ao transcrever áudio:", err.message);
-        return "";
-      }
-    }
-
-    return (
-      msg?.conversation ??
-      msg?.extendedTextMessage?.text ??
-      msg?.imageMessage?.caption ??
-      ""
-    );
+    await this.uazap.sendText(data.from, aiReply);
   }
 }
