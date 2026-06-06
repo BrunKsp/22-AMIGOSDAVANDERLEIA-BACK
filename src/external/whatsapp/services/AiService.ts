@@ -143,69 +143,75 @@ export class AiService {
       return { reply: choice.message.content ?? "Recebi sua mensagem! Como posso ajudar? 🌾" };
     }
 
-    const toolCall = choice.message.tool_calls[0];
-    const toolName = toolCall.function.name;
-    const args = JSON.parse(toolCall.function.arguments);
-
-    let toolResult: object;
+    // Processa TODOS os tool_calls retornados (OpenAI exige resposta para cada um)
     let transaction: ExtractedTransaction | undefined;
+    const toolResponses: any[] = [];
 
-    if (toolName === "registrar_transacao") {
-      transaction = {
-        type:        args.type,
-        description: args.description,
-        value:       args.value,
-        category:    args.category,
-        date:        new Date(args.date),
-        rawMessage:  userMessage,
-      };
-      toolResult = { success: true, registered: args };
+    for (const toolCall of choice.message.tool_calls) {
+      const toolName = toolCall.function.name;
+      const args = JSON.parse(toolCall.function.arguments);
+      let toolResult: object;
 
-    } else if (toolName === "consultar_transacoes" && userSlug) {
-      const [ano, mesNum] = (args.mes as string).split("-").map(Number);
-      const inicio = new Date(ano, mesNum - 1, 1);
-      const fim    = new Date(ano, mesNum, 1);
+      if (toolName === "registrar_transacao") {
+        transaction = {
+          type:        args.type,
+          description: args.description,
+          value:       args.value,
+          category:    args.category,
+          date:        new Date(args.date),
+          rawMessage:  userMessage,
+        };
+        toolResult = { success: true, registered: args };
 
-      const filtro: any = { userSlug, date: { $gte: inicio, $lt: fim } };
-      if (args.type !== "todos") filtro.type = args.type;
+      } else if (toolName === "consultar_transacoes" && userSlug) {
+        const [ano, mesNum] = (args.mes as string).split("-").map(Number);
+        const inicio = new Date(ano, mesNum - 1, 1);
+        const fim    = new Date(ano, mesNum, 1);
 
-      const transacoes = await Transaction.find(filtro).sort({ date: 1 }).lean();
+        const filtro: any = { userSlug, date: { $gte: inicio, $lt: fim } };
+        if (args.type !== "todos") filtro.type = args.type;
 
-      const totalDespesas = transacoes
-        .filter((t) => t.type === "despesa")
-        .reduce((s, t) => s + t.value, 0);
-      const totalReceitas = transacoes
-        .filter((t) => t.type === "receita")
-        .reduce((s, t) => s + t.value, 0);
+        const transacoes = await Transaction.find(filtro).sort({ date: 1 }).lean();
 
-      // Agrupa por categoria para o resumo
-      const porCategoria: Record<string, number> = {};
-      for (const t of transacoes) {
-        porCategoria[t.category] = (porCategoria[t.category] ?? 0) + t.value;
+        const totalDespesas = transacoes
+          .filter((t) => t.type === "despesa")
+          .reduce((s, t) => s + t.value, 0);
+        const totalReceitas = transacoes
+          .filter((t) => t.type === "receita")
+          .reduce((s, t) => s + t.value, 0);
+
+        const porCategoria: Record<string, number> = {};
+        for (const t of transacoes) {
+          porCategoria[t.category] = (porCategoria[t.category] ?? 0) + t.value;
+        }
+
+        toolResult = {
+          mes:             args.mes,
+          totalDespesas,
+          totalReceitas,
+          saldo:           totalReceitas - totalDespesas,
+          porCategoria,
+          quantidadeTotal: transacoes.length,
+          itens: transacoes.map((t) => ({
+            data:      t.date.toISOString().split("T")[0],
+            tipo:      t.type,
+            descricao: t.description,
+            valor:     t.value,
+            categoria: t.category,
+          })),
+        };
+      } else {
+        toolResult = { error: "Não foi possível processar." };
       }
 
-      const itens = transacoes.map((t) => ({
-        data:        t.date.toISOString().split("T")[0],
-        tipo:        t.type,
-        descricao:   t.description,
-        valor:       t.value,
-        categoria:   t.category,
-      }));
-
-      toolResult = {
-        mes:           args.mes,
-        totalDespesas,
-        totalReceitas,
-        saldo:         totalReceitas - totalDespesas,
-        porCategoria,
-        itens,
-        quantidadeTotal: transacoes.length,
-      };
-    } else {
-      toolResult = { error: "Não foi possível processar a consulta." };
+      toolResponses.push({
+        role:         "tool",
+        tool_call_id: toolCall.id,
+        content:      JSON.stringify(toolResult),
+      });
     }
 
-    // Segunda chamada: IA recebe o resultado da tool e gera a resposta final
+    // Segunda chamada: IA recebe os resultados de todos os tools e gera a resposta final
     const secondResponse = await this.callOpenAI([
       systemMsg,
       ...messages,
@@ -214,11 +220,7 @@ export class AiService {
         content:    choice.message.content ?? null,
         tool_calls: choice.message.tool_calls,
       },
-      {
-        role:         "tool",
-        tool_call_id: toolCall.id,
-        content:      JSON.stringify(toolResult),
-      },
+      ...toolResponses,
     ]);
 
     const reply = secondResponse.choices[0].message.content ?? "Pronto! ✅";
