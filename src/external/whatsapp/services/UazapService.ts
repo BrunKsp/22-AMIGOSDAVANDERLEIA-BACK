@@ -35,6 +35,11 @@ export class UazapService {
     return Buffer.from(response.data);
   }
 
+  async downloadMediaFromUrl(url: string): Promise<Buffer> {
+    const response = await axios.get(url, { responseType: "arraybuffer", timeout: 15_000 });
+    return Buffer.from(response.data);
+  }
+
   private normalizePhone(phone: string): string {
     const digits = phone.replace(/\D/g, "");
     return digits.startsWith("55") ? digits : `55${digits}`;

@@ -98,19 +98,37 @@ export class WhatsAppService {
         return;
       }
       try {
-        const audioBuffer = await this.uazap.downloadMedia({
-          remoteJid: chat.wa_chatid,
-          fromMe: message.fromMe,
-          id: message.messageid,
-        });
-        transcribedText = await this.transcription.transcribe(audioBuffer, "audio/ogg");
-        content = transcribedText;
-        if (!content.trim()) {
+        const mimetype = message.mimetype?.split(";")[0] ?? "audio/ogg";
+        let audioBuffer: Buffer;
+
+        if (message.mediaBase64) {
+          // Uazap já envia o áudio em base64 no payload — caminho mais rápido
+          audioBuffer = Buffer.from(message.mediaBase64, "base64");
+        } else if (message.mediaUrl) {
+          // Fallback: URL pública para download
+          audioBuffer = await this.uazap.downloadMediaFromUrl(message.mediaUrl);
+        } else {
+          // Fallback: download via endpoint do Uazap usando a chave da mensagem
+          audioBuffer = await this.uazap.downloadMedia({
+            remoteJid: chat.wa_chatid,
+            fromMe:    message.fromMe,
+            id:        message.messageid,
+          });
+        }
+
+        console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes, mimetype: ${mimetype}`);
+
+        transcribedText = await this.transcription.transcribe(audioBuffer, mimetype);
+        content = transcribedText.trim();
+
+        if (!content) {
           await this.uazap.sendText(replyTo, "Não consegui entender o áudio 🎙️ Pode repetir ou digitar?");
           return;
         }
+
+        console.log(`[audio] Transcrição: "${content}"`);
       } catch (err: any) {
-        console.error("[audio] Falha ao transcrever:", err.response?.data ?? err.message);
+        console.error("[audio] Falha ao processar áudio:", err.response?.data ?? err.message);
         await this.uazap.sendText(replyTo, "Tive um problema ao processar seu áudio 🙁 Tente digitar sua mensagem.");
         return;
       }
