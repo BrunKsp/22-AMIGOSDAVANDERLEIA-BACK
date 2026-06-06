@@ -11,7 +11,7 @@ import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsA
 export class WhatsAppService {
   private otpService     = new OtpService();
   private uazap          = new UazapService();
-  private ai             = new AiService();
+  private ai             = process.env.ANTHROPIC_API_KEY ? new AiService() : null;
   private transcription  = process.env.OPENAI_API_KEY ? new TranscriptionService() : null;
 
   async sendOtp(userSlug: string): Promise<string> {
@@ -80,7 +80,9 @@ export class WhatsAppService {
       return;
     }
 
-    const aiReply = await this.ai.generateReply(conversation._id, content);
+    const aiReply = this.ai
+      ? await this.ai.generateReply(conversation._id, content)
+      : "Olá! Recebi sua mensagem. Em breve a Vanderleia estará disponível para te ajudar! 🌾";
 
     await Message.create({
       conversationId: conversation._id,
