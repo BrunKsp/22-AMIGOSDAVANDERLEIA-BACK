@@ -239,7 +239,7 @@ Remove um usuário.
 ---
 
 ### `POST /whatsapp/send-otp` 🔒
-Envia um código de verificação de 6 dígitos via WhatsApp para o número (`phone`) cadastrado no perfil do usuário autenticado.
+Reenvia o código OTP para o WhatsApp do usuário. O código é enviado automaticamente no momento do cadastro (`POST /auth/register`), use esta rota apenas se o usuário não recebeu ou o código expirou.
 
 **Headers:** `Authorization: Bearer <token>`
 

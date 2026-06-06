@@ -1,6 +1,7 @@
 import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { UserRepository } from "../../infra/repositories/UserRepository";
+import { OtpService } from "./OtpService";
 import { RegisterDto } from "../dtos/RegisterDto";
 import { LoginDto } from "../dtos/LoginDto";
 import { IAuthResponse, ITokenPayload } from "../interfaces/IAuth";
@@ -12,9 +13,11 @@ const JWT_EXPIRES_IN = process.env.JWT_EXPIRES_IN ?? "7d";
 
 export class AuthService {
   private userRepository: UserRepository;
+  private otpService: OtpService;
 
   constructor() {
     this.userRepository = new UserRepository();
+    this.otpService = new OtpService();
   }
 
   async register(dto: RegisterDto): Promise<IAuthResponse> {
@@ -34,6 +37,10 @@ export class AuthService {
       cpf: dto.cpf,
       birthDate: new Date(dto.birthDate),
       slug: generateSlug(),
+    });
+
+    this.otpService.sendOtp(user.phone, user.slug).catch((err) => {
+      console.error("[register] Falha ao enviar OTP:", err.message);
     });
 
     return this.buildAuthResponse(user.id, user.slug, user.email, user.name);
