@@ -29,6 +29,17 @@ export class WhatsAppController {
   }
 
   async webhook(req: Request, res: Response): Promise<void> {
+    // Verificação opcional de segredo: só ativa se WEBHOOK_SECRET estiver definido.
+    // Configure a URL do webhook no Uazapi com ?secret=... (ou header x-webhook-secret).
+    const expectedSecret = process.env.WEBHOOK_SECRET;
+    if (expectedSecret) {
+      const provided = (req.headers["x-webhook-secret"] as string) || (req.query.secret as string);
+      if (provided !== expectedSecret) {
+        res.sendStatus(401);
+        return;
+      }
+    }
+
     res.sendStatus(200);
     const payload = req.body as IUazapWebhookPayload;
     const m = payload?.message;
