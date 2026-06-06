@@ -41,7 +41,8 @@ export class AuthService {
     });
 
     this.otpService.sendOtp(user.phone, user.slug).catch((err) => {
-      console.error("[register] Falha ao enviar OTP:", err.message);
+      const detail = err?.response?.data ?? err.message;
+      console.error("[register] Falha ao enviar OTP:", JSON.stringify(detail));
     });
 
     return this.buildAuthResponse(user.id, user.slug, user.email, user.name);
