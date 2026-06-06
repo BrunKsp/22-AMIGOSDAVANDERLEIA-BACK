@@ -14,9 +14,23 @@ import { UserRepository } from "../../infra/repositories/UserRepository";
 export class WhatsAppService {
   private otpService     = new OtpService();
   private uazap          = new UazapService();
-  private ai             = process.env.OPENAI_API_KEY ? new AiService() : null;
-  private transcription  = process.env.OPENAI_API_KEY ? new TranscriptionService() : null;
   private userRepository = new UserRepository();
+  private _ai:           AiService | null = null;
+  private _transcription: TranscriptionService | null = null;
+
+  private get ai(): AiService | null {
+    if (!this._ai && process.env.OPENAI_API_KEY) {
+      this._ai = new AiService();
+    }
+    return this._ai;
+  }
+
+  private get transcription(): TranscriptionService | null {
+    if (!this._transcription && process.env.OPENAI_API_KEY) {
+      this._transcription = new TranscriptionService();
+    }
+    return this._transcription;
+  }
 
   async sendOtp(userSlug: string): Promise<string> {
     const userRepo = AppDataSource.getRepository(User);
