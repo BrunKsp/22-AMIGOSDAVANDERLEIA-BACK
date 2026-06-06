@@ -8,6 +8,11 @@ import { Conversation } from "../../data/Infra.Documents/Conversation";
 import { Message } from "../../data/Infra.Documents/Message";
 import { IUazapWebhookPayload } from "../../external/whatsapp/interfaces/IWhatsApp";
 
+function normalizePhone(phone: string): string {
+  const digits = phone.replace(/\D/g, "");
+  return digits.startsWith("55") ? digits : `55${digits}`;
+}
+
 export class WhatsAppService {
   private otpService     = new OtpService();
   private uazap          = new UazapService();
@@ -33,10 +38,11 @@ export class WhatsAppService {
     await this.otpService.verifyOtp(user.phone, code);
     await userRepo.update({ slug: userSlug }, { phoneVerified: true });
 
+    const phoneNorm = normalizePhone(user.phone);
     await Conversation.findOneAndUpdate(
-      { phoneNumber: user.phone },
+      { phoneNumber: phoneNorm },
       { userSlug, status: "active", lastMessageAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
 
     await this.uazap.sendText(
@@ -48,21 +54,21 @@ export class WhatsAppService {
   async handleWebhook(payload: IUazapWebhookPayload): Promise<void> {
     const { data } = payload;
 
-    const phone   = data.from.replace(/\D/g, "").replace(/^55/, "");
+    const phone   = normalizePhone(data.from);
     const content = data.body?.trim();
     if (!content) return;
 
     const isAudio = data.type === "audio" || data.mimetype?.includes("audio");
 
     const conversation = await Conversation.findOneAndUpdate(
-      { phoneNumber: data.from },
+      { phoneNumber: phone },
       { lastMessageAt: new Date() },
-      { upsert: true, new: true }
+      { upsert: true, returnDocument: "after" }
     );
 
     await Message.create({
       conversationId: conversation._id,
-      phoneNumber: data.from,
+      phoneNumber: phone,
       userSlug: conversation.userSlug,
       direction: "inbound",
       type: isAudio ? "audio" : "text",
@@ -73,19 +79,25 @@ export class WhatsAppService {
 
     if (conversation.status !== "active") {
       await this.uazap.sendText(
-        data.from,
+        phone,
         `Olá! Para conversar comigo você precisa vincular este número na plataforma.\n\nAcesse a plataforma → Configurações → "Vincular WhatsApp".`
       );
       return;
     }
 
-    const aiReply = this.ai
-      ? await this.ai.generateReply(conversation._id, content)
-      : "Olá! Recebi sua mensagem. Em breve a Vanderleia estará disponível para te ajudar! 🌾";
+    let aiReply: string;
+    try {
+      aiReply = this.ai
+        ? await this.ai.generateReply(conversation._id, content)
+        : "Olá! Recebi sua mensagem. Em breve a Vanderleia estará disponível para te ajudar! 🌾";
+    } catch (err: any) {
+      console.error("[ai] Erro ao gerar resposta:", err.response?.data ?? err.message);
+      return;
+    }
 
     await Message.create({
       conversationId: conversation._id,
-      phoneNumber: data.from,
+      phoneNumber: phone,
       userSlug: conversation.userSlug,
       direction: "outbound",
       type: "text",
@@ -93,6 +105,10 @@ export class WhatsAppService {
       sentAt: new Date(),
     });
 
-    await this.uazap.sendText(data.from, aiReply);
+    try {
+      await this.uazap.sendText(phone, aiReply);
+    } catch (err: any) {
+      console.error("[uazap] Erro ao enviar mensagem:", err.response?.data ?? err.message);
+    }
   }
 }
