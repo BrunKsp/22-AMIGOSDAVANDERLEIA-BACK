@@ -50,6 +50,7 @@ export interface IUazapWebhookPayload {
     messageTimestamp: number;
     messageid: string;
     type?: string;
+    messageType?: string;
     mediaType?: string;
     mimetype?: string;
     mediaBase64?: string;

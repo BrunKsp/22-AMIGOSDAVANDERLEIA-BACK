@@ -72,7 +72,8 @@ export class WhatsAppService {
     const phone   = normalizePhone(chat.wa_chatid.replace("@s.whatsapp.net", ""));
     const replyTo = chat.wa_chatid.replace("@s.whatsapp.net", "");
 
-    const isAudio = message.type === "audio" || message.type === "ptt" || message.mediaType === "audio";
+    const typeStr = `${message.messageType ?? ""} ${message.type ?? ""} ${message.mediaType ?? ""}`.toLowerCase();
+    const isAudio = typeStr.includes("audio") || typeStr.includes("ptt") || (message.mimetype ?? "").toLowerCase().includes("audio");
 
     // Para texto, extrai o conteúdo bruto agora; para áudio, será preenchido após transcrição
     let content = isAudio ? "" : (message.text || message.content || "").trim();
@@ -98,23 +99,13 @@ export class WhatsAppService {
         return;
       }
       try {
-        const mimetype = message.mimetype?.split(";")[0] ?? "audio/ogg";
-        let audioBuffer: Buffer;
+        // Baixa o áudio já descriptografado e convertido em MP3 pelo Uazapi.
+        // (não usar a URL .enc crua do WhatsApp — vem criptografada)
+        const audioBuffer = await this.uazap.downloadMedia(message.messageid);
 
-        if (message.mediaBase64) {
-          // Uazap já envia o áudio em base64 no payload — caminho mais rápido
-          audioBuffer = Buffer.from(message.mediaBase64, "base64");
-        } else if (message.mediaUrl) {
-          // Fallback: URL pública para download
-          audioBuffer = await this.uazap.downloadMediaFromUrl(message.mediaUrl);
-        } else {
-          // Fallback: download via endpoint do Uazap usando o id da mensagem
-          audioBuffer = await this.uazap.downloadMedia(message.messageid);
-        }
+        console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes (id=${message.messageid})`);
 
-        console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes, mimetype: ${mimetype}`);
-
-        transcribedText = await this.transcription.transcribe(audioBuffer, mimetype);
+        transcribedText = await this.transcription.transcribe(audioBuffer, "audio/mpeg");
         content = transcribedText.trim();
 
         if (!content) {
