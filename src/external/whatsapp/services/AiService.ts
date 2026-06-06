@@ -30,6 +30,8 @@ const SYSTEM_PROMPT = `Você é a *Vanderleia*, a assistente de inteligência ar
 
 # Memória:
 - Você LEMBRA da conversa recente (tem as últimas mensagens deste produtor no contexto). Dê continuidade natural e NUNCA diga que "não guarda conversas" — isso é falso.
+- Responda SOMENTE o que foi perguntado. NÃO repita o resumo financeiro (saldo, despesas, receitas) se o produtor não pediu de novo — só mostre números quando ele pedir.
+- Se o produtor pedir para ser chamado por outro nome/apelido, use a ferramenta definir_apelido para salvar de verdade (vale pras próximas conversas). Não prometa lembrar de algo sem salvar.
 
 # Seu jeito de falar:
 - Converse como uma pessoa real no WhatsApp: simpática, próxima e direta, em português brasileiro do dia a dia. Acolhedora sem exagero — NADA de forçar sotaque, gírias ou caricatura de roça.
@@ -131,6 +133,26 @@ const TOOLS = [
       },
     },
   },
+  {
+    type: "function" as const,
+    function: {
+      name: "definir_apelido",
+      description:
+        "Salva de forma permanente como o produtor quer ser chamado. Chame quando ele pedir para ser " +
+        "chamado por outro nome/apelido (ex: 'me chama de Vinícius', 'pode me chamar de seu João'). " +
+        "Depois de salvar, esse nome passa a valer em todas as conversas futuras.",
+      parameters: {
+        type: "object",
+        properties: {
+          apelido: {
+            type: "string",
+            description: "Como o produtor quer ser chamado, só o nome/apelido.",
+          },
+        },
+        required: ["apelido"],
+      },
+    },
+  },
 ];
 
 export interface ExtractedTransaction {
@@ -145,6 +167,7 @@ export interface ExtractedTransaction {
 export interface AiReplyResult {
   reply: string;
   transaction?: ExtractedTransaction;
+  preferredName?: string;
 }
 
 /**
@@ -199,12 +222,21 @@ export class AiService {
       messages.push({ role: "user", content: userMessage });
     }
 
-    const today = new Date().toISOString().split("T")[0];
+    const agora = new Date();
+    const isoHoje = agora.toLocaleDateString("en-CA", { timeZone: "America/Sao_Paulo" }); // YYYY-MM-DD
+    const dataHora = agora.toLocaleString("pt-BR", {
+      timeZone: "America/Sao_Paulo",
+      dateStyle: "full",
+      timeStyle: "short",
+    });
     const firstName = userName?.trim().split(/\s+/)[0];
     const nameLine = firstName
       ? `\n\nO produtor com quem você está falando se chama *${firstName}*. Use o primeiro nome dele de forma natural — nunca chame por outro nome.`
       : "";
-    const systemWithContext = `${SYSTEM_PROMPT}${nameLine}\n\nData de hoje: ${today}`;
+    const systemWithContext =
+      `${SYSTEM_PROMPT}${nameLine}` +
+      `\n\nData de hoje (use nas transações): ${isoHoje}.` +
+      `\nAgora, por extenso (horário de Brasília): ${dataHora}. Você sabe a data e a hora atuais — responda se perguntarem.`;
     const systemMsg = { role: "system", content: systemWithContext };
 
     const firstResponse = await this.callOpenAI([systemMsg, ...messages]);
@@ -216,6 +248,7 @@ export class AiService {
 
     // Processa TODOS os tool_calls retornados (OpenAI exige resposta para cada um)
     let transaction: ExtractedTransaction | undefined;
+    let preferredName: string | undefined;
     const toolResponses: any[] = [];
 
     for (const toolCall of choice.message.tool_calls) {
@@ -275,6 +308,12 @@ export class AiService {
         const resultado = await this.searchWeb(args.consulta);
         toolResult = { consulta: args.consulta, resultado };
 
+      } else if (toolName === "definir_apelido") {
+        preferredName = String(args.apelido ?? "").trim().slice(0, 60);
+        toolResult = preferredName
+          ? { success: true, apelido: preferredName }
+          : { error: "Apelido inválido." };
+
       } else {
         toolResult = { error: "Não foi possível processar." };
       }
@@ -299,7 +338,7 @@ export class AiService {
     ]);
 
     const reply = formatForWhatsApp(secondResponse.choices[0].message.content) ?? "Pronto! ✅";
-    return { reply, transaction };
+    return { reply, transaction, preferredName };
   }
 
   private async callOpenAI(messages: any[]) {

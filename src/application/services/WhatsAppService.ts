@@ -75,13 +75,12 @@ export class WhatsAppService {
     const typeStr = `${message.messageType ?? ""} ${message.type ?? ""} ${message.mediaType ?? ""}`.toLowerCase();
     const isAudio = typeStr.includes("audio") || typeStr.includes("ptt") || (message.mimetype ?? "").toLowerCase().includes("audio");
 
-    // Para texto, extrai o conteúdo bruto agora; para áudio, será preenchido após transcrição
+    // Para texto, o conteúdo já vem agora; para áudio é preenchido após a transcrição.
     let content = isAudio ? "" : (message.text || message.content || "").trim();
-    let transcribedText: string | null = null;
 
     if (!isAudio && !content) return;
 
-    // Deduplicação por messageId
+    // Deduplicação rápida por messageId
     if (message.messageid && (await Message.exists({ messageId: message.messageid }))) {
       return;
     }
@@ -92,70 +91,41 @@ export class WhatsAppService {
       { upsert: true, returnDocument: "after" }
     );
 
-    // Mostra "digitando..." enquanto processa (transcrição + IA).
-    // É cancelado automaticamente quando a resposta é enviada.
+    // Mostra "digitando..." enquanto processa. Cancelado ao enviar a resposta.
     await this.uazap.sendPresence(replyTo, "composing");
 
-    // Transcreve áudio antes de salvar a mensagem
-    if (isAudio) {
-      if (!this.transcription) {
-        await this.uazap.sendText(replyTo, "⚠️ Transcrição de áudio não disponível no momento. Pode digitar sua mensagem?");
-        return;
-      }
-      try {
-        // Baixa o áudio já descriptografado e convertido em MP3 pelo Uazapi.
-        // (não usar a URL .enc crua do WhatsApp — vem criptografada)
-        const audioBuffer = await this.uazap.downloadMedia(message.messageid);
-
-        console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes (id=${message.messageid})`);
-
-        transcribedText = await this.transcription.transcribe(audioBuffer, "audio/mpeg");
-        content = transcribedText.trim();
-
-        if (!content) {
-          await this.uazap.sendText(replyTo, "Não consegui entender o áudio 🎙️ Pode repetir ou digitar?");
-          return;
-        }
-
-        console.log(`[audio] Transcrição: "${content}"`);
-      } catch (err: any) {
-        console.error("[audio] Falha ao processar áudio:", err.response?.data ?? err.message);
-        await this.uazap.sendText(replyTo, "Tive um problema ao processar seu áudio 🙁 Tente digitar sua mensagem.");
-        return;
-      }
-    }
-
-    // Salva mensagem inbound (com transcrição no content para áudio)
+    // Reserva a mensagem ANTES de transcrever: o índice único do messageId evita
+    // corrida e transcrição em dobro caso o webhook chegue mais de uma vez.
+    let inbound;
     try {
-      await Message.create({
+      inbound = await Message.create({
         conversationId: conversation._id,
         messageId:      message.messageid,
         phoneNumber:    phone,
         userSlug:       conversation.userSlug,
         direction:      "inbound",
         type:           isAudio ? "audio" : "text",
-        content,
+        content:        isAudio ? "[áudio]" : content,
         rawPayload:     message as unknown as Record<string, unknown>,
-        sentAt:         new Date(message.messageTimestamp * 1000),
+        sentAt:         message.messageTimestamp ? new Date(message.messageTimestamp * 1000) : new Date(),
       });
     } catch (err: any) {
-      if (err?.code === 11000) return; // duplicado por race condition
+      if (err?.code === 11000) return; // duplicado / corrida
       throw err;
     }
 
+    // Confere o vínculo do número ANTES de gastar transcrição/IA.
     if (conversation.status !== "active") {
-      // Verifica se o usuário já tem o número verificado no Postgres
       const pgUser = await this.userRepository.findByPhone(phone);
 
       console.log(`[webhook] status=${conversation.status} phone=${phone} pgUser=${pgUser?.slug ?? "null"} phoneVerified=${pgUser?.phoneVerified ?? "null"}`);
 
       if (pgUser?.phoneVerified) {
-        // Ativa a conversa no Mongo e continua o fluxo normalmente
         await Conversation.findOneAndUpdate(
           { phoneNumber: phone },
           { userSlug: pgUser.slug, status: "active" }
         );
-        conversation.status  = "active";
+        conversation.status   = "active";
         conversation.userSlug = pgUser.slug;
       } else {
         await this.uazap.sendText(
@@ -166,21 +136,55 @@ export class WhatsAppService {
       }
     }
 
+    // Transcreve o áudio (já com vínculo confirmado) e atualiza o conteúdo salvo.
+    if (isAudio) {
+      if (!this.transcription) {
+        await this.uazap.sendText(replyTo, "⚠️ Transcrição de áudio não disponível no momento. Pode digitar sua mensagem?");
+        return;
+      }
+      try {
+        // Áudio já descriptografado e convertido em MP3 pelo Uazapi
+        // (não usar a URL .enc crua do WhatsApp — vem criptografada).
+        const audioBuffer = await this.uazap.downloadMedia(message.messageid);
+        console.log(`[audio] Buffer obtido: ${audioBuffer.length} bytes (id=${message.messageid})`);
+
+        content = (await this.transcription.transcribe(audioBuffer, "audio/mpeg")).trim();
+
+        if (!content) {
+          await this.uazap.sendText(replyTo, "Não consegui entender o áudio 🎙️ Pode repetir ou digitar?");
+          return;
+        }
+
+        inbound.content = content;
+        await inbound.save();
+        console.log(`[audio] Transcrição: "${content}"`);
+      } catch (err: any) {
+        console.error("[audio] Falha ao processar áudio:", err.response?.data ?? err.message);
+        await this.uazap.sendText(replyTo, "Tive um problema ao processar seu áudio 🙁 Tente digitar sua mensagem.");
+        return;
+      }
+    }
+
     // Gera resposta da IA (com detecção de transação via function calling)
     let aiReply: string;
     try {
       if (!this.ai) {
         aiReply = "Olá! Recebi sua mensagem. Em breve a Vanderleia estará disponível para te ajudar! 🌾";
       } else {
-        // Busca o nome real do produtor no banco para a IA tratá-lo corretamente
-        let userName: string | undefined;
-        if (conversation.userSlug) {
+        // Apelido salvo na conversa tem prioridade sobre o nome do cadastro.
+        let userName: string | undefined = conversation.preferredName ?? undefined;
+        if (!userName && conversation.userSlug) {
           const pgUser = await this.userRepository.findBySlug(conversation.userSlug);
           userName = pgUser?.name;
         }
 
         const result = await this.ai.generateReply(conversation._id, content, conversation.userSlug, userName);
         aiReply = result.reply;
+
+        // Persiste o apelido se o produtor pediu para ser chamado de outro jeito.
+        if (result.preferredName && result.preferredName !== conversation.preferredName) {
+          await Conversation.findByIdAndUpdate(conversation._id, { preferredName: result.preferredName });
+        }
 
         // Salva transação extraída pela IA
         if (result.transaction && conversation.userSlug) {
@@ -203,6 +207,9 @@ export class WhatsAppService {
       }
     } catch (err: any) {
       console.error("[ai] Erro ao gerar resposta:", err.response?.data ?? err.message);
+      try {
+        await this.uazap.sendText(replyTo, "Tive uma instabilidade aqui agora 🙈 Pode mandar de novo daqui a pouquinho?");
+      } catch { /* ignora falha no envio do aviso */ }
       return;
     }
 

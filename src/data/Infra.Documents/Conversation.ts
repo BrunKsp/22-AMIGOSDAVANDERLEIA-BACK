@@ -13,6 +13,7 @@ const ConversationSchema = new Schema<IConversationDocument>(
       default: "pending_otp",
     },
     lastMessageAt: { type: Date, default: Date.now },
+    preferredName: { type: String },
     metadata:      { type: Schema.Types.Mixed },
   },
   { timestamps: true }

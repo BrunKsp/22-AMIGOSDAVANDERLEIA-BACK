@@ -19,6 +19,7 @@ export interface IConversation {
   userSlug?: string;
   status: ConversationStatus;
   lastMessageAt: Date;
+  preferredName?: string;
   metadata?: Record<string, unknown>;
 }
 
