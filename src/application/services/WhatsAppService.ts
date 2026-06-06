@@ -168,7 +168,14 @@ export class WhatsAppService {
       if (!this.ai) {
         aiReply = "Olá! Recebi sua mensagem. Em breve a Vanderleia estará disponível para te ajudar! 🌾";
       } else {
-        const result = await this.ai.generateReply(conversation._id, content, conversation.userSlug);
+        // Busca o nome real do produtor no banco para a IA tratá-lo corretamente
+        let userName: string | undefined;
+        if (conversation.userSlug) {
+          const pgUser = await this.userRepository.findBySlug(conversation.userSlug);
+          userName = pgUser?.name;
+        }
+
+        const result = await this.ai.generateReply(conversation._id, content, conversation.userSlug, userName);
         aiReply = result.reply;
 
         // Salva transação extraída pela IA
