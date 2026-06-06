@@ -51,6 +51,9 @@ export interface IUazapWebhookPayload {
     messageid: string;
     type?: string;
     mediaType?: string;
+    mimetype?: string;
+    mediaBase64?: string;
+    mediaUrl?: string;
     sender_pn?: string;
   };
 }
