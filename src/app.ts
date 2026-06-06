@@ -1,11 +1,17 @@
 import "reflect-metadata";
 import express from "express";
+import cors from "cors";
 import authRoutes from "./routes/authRoutes";
 import userRoutes from "./routes/userRoutes";
 import whatsappRoutes from "./routes/whatsappRoutes";
 
 const app = express();
 
+app.use(cors({
+  origin: process.env.CORS_ORIGIN ?? "*",
+  methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
+  allowedHeaders: ["Content-Type", "Authorization"],
+}));
 app.use(express.json());
 
 app.get("/health", (_req, res) => {
