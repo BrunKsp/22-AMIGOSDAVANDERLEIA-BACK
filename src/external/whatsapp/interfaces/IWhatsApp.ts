@@ -4,6 +4,7 @@ export type ConversationStatus = "pending_otp" | "active" | "closed";
 
 export interface IMessage {
   conversationId: string;
+  messageId?: string;
   phoneNumber: string;
   userSlug?: string;
   direction: MessageDirection;
