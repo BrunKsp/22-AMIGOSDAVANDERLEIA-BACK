@@ -98,7 +98,6 @@ export class WhatsAppService {
         const mimetype = audio.mimetype?.split(";")[0] ?? "audio/ogg";
         let audioBuffer: Buffer;
 
-        // Tenta baixar via endpoint do Uazap usando a chave da mensagem
         audioBuffer = await this.uazap.downloadMedia({
           remoteJid,
           fromMe: key.fromMe,
